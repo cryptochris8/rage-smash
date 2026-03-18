@@ -107,6 +107,86 @@ export class AdPrompts {
     this.container.appendChild(root);
   }
 
+  /** Jackpot bonus: "Double your jackpot!" */
+  showJackpotBonus(jackpotCoins: number): void {
+    if (jackpotCoins <= 0) return;
+
+    const root = this.createModalRoot();
+    const card = this.createCard();
+
+    card.appendChild(this.createTitle('JACKPOT!'));
+
+    const desc = document.createElement('div');
+    desc.textContent = `You won ${jackpotCoins.toLocaleString()} coins! Double it?`;
+    Object.assign(desc.style, {
+      fontSize: '15px',
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'center',
+      marginBottom: '20px',
+      lineHeight: '1.4',
+    });
+    card.appendChild(desc);
+
+    const watchBtn = this.createActionButton('DOUBLE IT');
+    watchBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      this.removeModal(root);
+      const success = await this.adManager.showRewarded('jackpot_bonus');
+      if (success) {
+        this.store.update({ coins: this.store.state.coins + jackpotCoins });
+        this.audioManager.playDailyReward();
+      } else {
+        this.showAdUnavailable();
+      }
+    });
+    card.appendChild(watchBtn);
+
+    card.appendChild(this.createDismissButton(root));
+
+    root.appendChild(card);
+    this.container.appendChild(root);
+  }
+
+  /** Daily bonus double: "Double your daily reward!" */
+  showDailyBonusDouble(rewardCoins: number): void {
+    if (rewardCoins <= 0) return;
+
+    const root = this.createModalRoot();
+    const card = this.createCard();
+
+    card.appendChild(this.createTitle('DOUBLE REWARD'));
+
+    const desc = document.createElement('div');
+    desc.textContent = `Watch a short video to double your ${rewardCoins.toLocaleString()} coin reward?`;
+    Object.assign(desc.style, {
+      fontSize: '15px',
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'center',
+      marginBottom: '20px',
+      lineHeight: '1.4',
+    });
+    card.appendChild(desc);
+
+    const watchBtn = this.createActionButton('DOUBLE IT');
+    watchBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      this.removeModal(root);
+      const success = await this.adManager.showRewarded('daily_bonus_optional');
+      if (success) {
+        this.store.update({ coins: this.store.state.coins + rewardCoins });
+        this.audioManager.playDailyReward();
+      } else {
+        this.showAdUnavailable();
+      }
+    });
+    card.appendChild(watchBtn);
+
+    card.appendChild(this.createDismissButton(root));
+
+    root.appendChild(card);
+    this.container.appendChild(root);
+  }
+
   /** Red toast: "Ad unavailable, try again soon" */
   showAdUnavailable(): void {
     const el = document.createElement('div');

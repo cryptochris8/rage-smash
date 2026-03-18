@@ -8,6 +8,7 @@ export class LoginRewardUI {
   private loginSystem: LoginRewardSystem;
   private audioManager: AudioManager;
   private onDay7Reward: (() => void) | null = null;
+  private onDailyDouble: ((coins: number) => void) | null = null;
   private root: HTMLDivElement | null = null;
 
   constructor(
@@ -16,12 +17,14 @@ export class LoginRewardUI {
     loginSystem: LoginRewardSystem,
     audioManager: AudioManager,
     onDay7Reward?: () => void,
+    onDailyDouble?: (coins: number) => void,
   ) {
     this.container = container;
     this.store = store;
     this.loginSystem = loginSystem;
     this.audioManager = audioManager;
     this.onDay7Reward = onDay7Reward ?? null;
+    this.onDailyDouble = onDailyDouble ?? null;
   }
 
   show(): void {
@@ -207,6 +210,11 @@ export class LoginRewardUI {
 
     if (result.isDay7 && this.onDay7Reward) {
       this.onDay7Reward();
+    }
+
+    // Offer daily double via ad
+    if (this.onDailyDouble) {
+      this.onDailyDouble(result.coins);
     }
 
     // Update card visual

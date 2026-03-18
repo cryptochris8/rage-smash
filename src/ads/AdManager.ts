@@ -28,6 +28,8 @@ export class AdManager implements IAdSystem {
 
   // Session tracking
   private sessionCoinsEarned = 0;
+  private sessionSmashCount = 0;
+  private lastSessionBonusAt = 0;
 
   // Error state
   private lastError: string | null = null;
@@ -155,6 +157,19 @@ export class AdManager implements IAdSystem {
 
   onSmash(): void {
     this.roundsSinceInterstitial++;
+    this.sessionSmashCount++;
+  }
+
+  /** Returns true every 10 smashes since the last session-end bonus offer */
+  shouldOfferSessionBonus(): boolean {
+    const smashInterval = 10;
+    if (this.sessionCoinsEarned <= 0) return false;
+    if (!this.canShowRewarded('session_end_bonus')) return false;
+    return this.sessionSmashCount - this.lastSessionBonusAt >= smashInterval;
+  }
+
+  markSessionBonusOffered(): void {
+    this.lastSessionBonusAt = this.sessionSmashCount;
   }
 
   trackCoinsEarned(amount: number): void {

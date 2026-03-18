@@ -213,6 +213,10 @@ export class Game {
     this.loginRewardUI = new LoginRewardUI(container, this.store, this.loginRewardSystem, this.audioManager, () => {
       this.overlays.showUnlockCelebration('JACKPOT BOOST');
       this.audioManager.playJackpotSound();
+    }, (coins) => {
+      if (this.adManager.canShowRewarded('daily_bonus_optional')) {
+        setTimeout(() => this.adPrompts.showDailyBonusDouble(coins), 500);
+      }
     });
     this.starterPackUI = new StarterPackUI(container, this.store, this.starterPackSystem, this.audioManager);
     this.goalsPanel = new GoalsPanel(
@@ -291,6 +295,12 @@ export class Game {
         }
 
         this.updateGoalsPanel();
+
+        // Periodic session-end bonus offer (every 10 smashes)
+        if (this.adManager.shouldOfferSessionBonus()) {
+          this.adManager.markSessionBonusOffered();
+          setTimeout(() => this.offerSessionEndBonus(), 800);
+        }
       }
       this.prevCoins = coins;
 
@@ -303,6 +313,12 @@ export class Game {
         this.voiceManager.playRewardVoice();
         // Reset jackpot flag
         this.store.update({ jackpotActive: false });
+
+        // Offer jackpot double ad after a brief delay for effects to land
+        const jackpotCoins = coins - this.prevCoins;
+        if (jackpotCoins > 0 && this.adManager.canShowRewarded('jackpot_bonus')) {
+          setTimeout(() => this.adPrompts.showJackpotBonus(jackpotCoins), 1200);
+        }
       }
 
       // Combo flash + HUD pulse
@@ -412,10 +428,13 @@ export class Game {
       // Show near-miss progress prompt on fail
       this.showProgressPrompt();
 
-      // Session-end bonus prompt after a delay
-      const sessionCoins = this.adManager.getSessionCoinsEarned();
-      if (sessionCoins > 0 && this.adManager.canShowRewarded('session_end_bonus')) {
-        setTimeout(() => this.adPrompts.showSessionEndBonus(sessionCoins), 1500);
+      // Try interstitial first, then session-end bonus
+      if (this.adManager.shouldShowInterstitial()) {
+        this.adManager.showInterstitial().then(() => {
+          this.offerSessionEndBonus();
+        });
+      } else {
+        setTimeout(() => this.offerSessionEndBonus(), 1500);
       }
       return;
     }
@@ -561,6 +580,11 @@ export class Game {
       this.inDailyChallenge = false;
       this.dailyUI.showResults(result);
       this.spawnSystem.spawnNext();
+
+      // Interstitial after daily challenge
+      if (this.adManager.shouldShowInterstitial()) {
+        this.adManager.showInterstitial();
+      }
     } else {
       const nextObj = this.dailyChallenge.getNextObject();
       if (nextObj) {
@@ -599,6 +623,15 @@ export class Game {
 
   private toggleMute() {
     this.store.update({ muted: !this.store.state.muted });
+  }
+
+  // --- Session-End Ad Offers ---
+
+  private offerSessionEndBonus(): void {
+    const sessionCoins = this.adManager.getSessionCoinsEarned();
+    if (sessionCoins > 0 && this.adManager.canShowRewarded('session_end_bonus')) {
+      this.adPrompts.showSessionEndBonus(sessionCoins);
+    }
   }
 
   // --- Retention Goals/Challenges ---
