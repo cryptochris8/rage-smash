@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rage Smash</string>
+    <string name="title_activity_main">Rage Smash</string>
+    <string name="package_name">com.ragesmash.app</string>
+    <string name="custom_url_scheme">com.ragesmash.app</string>
+</resources>
