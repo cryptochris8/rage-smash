@@ -45,8 +45,7 @@ export const INTERSTITIAL_GATING: InterstitialGating = {
   minSessionLengthSec: 60,
 };
 
-export const ADMOB_IDS = {
-  // Test IDs for dev — replace with production IDs before release
+const TEST_IDS = {
   ios: {
     rewarded: 'ca-app-pub-3940256099942544/1712485313',
     interstitial: 'ca-app-pub-3940256099942544/4411468910',
@@ -56,3 +55,21 @@ export const ADMOB_IDS = {
     interstitial: 'ca-app-pub-3940256099942544/1033173712',
   },
 };
+
+// ⚠️  Replace these with your real AdMob ad unit IDs from https://admob.google.com
+const PRODUCTION_IDS = {
+  ios: {
+    rewarded: 'ca-app-pub-XXXXX/XXXXX',       // TODO: replace before release
+    interstitial: 'ca-app-pub-XXXXX/XXXXX',    // TODO: replace before release
+  },
+  android: {
+    rewarded: 'ca-app-pub-XXXXX/XXXXX',        // TODO: replace before release
+    interstitial: 'ca-app-pub-XXXXX/XXXXX',    // TODO: replace before release
+  },
+};
+
+/** Set to true for production builds. Controls which ad unit IDs are used
+ *  and whether AdMob initializes in testing mode. */
+export const AD_PRODUCTION = false; // TODO: flip to true before release
+
+export const ADMOB_IDS = AD_PRODUCTION ? PRODUCTION_IDS : TEST_IDS;

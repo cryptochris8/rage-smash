@@ -1,5 +1,5 @@
 import { AdProvider, RewardedPlacement, InterstitialPlacement } from './types';
-import { ADMOB_IDS } from './config';
+import { ADMOB_IDS, AD_PRODUCTION } from './config';
 import { adAnalytics } from './analytics';
 
 export class AdMobProvider implements AdProvider {
@@ -17,11 +17,27 @@ export class AdMobProvider implements AdProvider {
       const { Capacitor } = await import('@capacitor/core');
       this.platform = Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
 
-      await AdMob.initialize({ initializeForTesting: true });
-      console.log('[AdMobProvider] Initialized');
+      // Request ATT authorization before initializing ads (iOS 14.5+)
+      await this.requestTrackingAuthorization();
+
+      await AdMob.initialize({ initializeForTesting: !AD_PRODUCTION });
+      console.log(`[AdMobProvider] Initialized (production=${AD_PRODUCTION})`);
     } catch (err) {
       console.warn('[AdMobProvider] Failed to initialize:', err);
       throw err;
+    }
+  }
+
+  private async requestTrackingAuthorization(): Promise<void> {
+    if (this.platform !== 'ios') return;
+    try {
+      const { AdMob } = await import('@capacitor-community/admob');
+      const info = await AdMob.trackingAuthorizationStatus();
+      if (info.status === 'notDetermined') {
+        await AdMob.requestTrackingAuthorization();
+      }
+    } catch (err) {
+      console.warn('[AdMobProvider] ATT request failed:', err);
     }
   }
 

@@ -10,7 +10,7 @@ workflows:
       groups:
         - app_store_credentials  # Configure in Codemagic UI
       vars:
-        BUNDLE_ID: "com.smashloop.app"
+        BUNDLE_ID: "com.ragesmash.app"
     scripts:
       - name: Install dependencies
         script: |
