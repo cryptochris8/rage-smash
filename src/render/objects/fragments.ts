@@ -126,6 +126,80 @@ export class FragmentManager {
     }
   }
 
+  /** Lateral (crushed) fragment explosion — horizontal velocity bias, more shards */
+  explodeCrushed(
+    position: THREE.Vector3,
+    color: number,
+    extraCount: number = 0,
+    colorOverrides?: number[],
+  ): void {
+    const total = CONFIG.fragmentCount + extraCount;
+
+    for (let i = 0; i < total; i++) {
+      if (this.fragments.length >= CONFIG.maxFragments) {
+        const oldest = this.fragments.shift()!;
+        this.scene.remove(oldest.mesh);
+        oldest.mesh.geometry.dispose();
+        (oldest.mesh.material as THREE.Material).dispose();
+      }
+
+      const size = 0.1 + Math.random() * 0.18;
+
+      // Inverted shape distribution: 60% shard, 25% box, 15% tetrahedron
+      const r = Math.random();
+      let shape: FragmentShapeType;
+      if (r < 0.60) shape = 'shard';
+      else if (r < 0.85) shape = 'box';
+      else shape = 'tetrahedron';
+
+      const geometry = createFragmentGeometry(shape, size);
+
+      let baseColor = color;
+      if (colorOverrides && colorOverrides.length > 0) {
+        baseColor = colorOverrides[Math.floor(Math.random() * colorOverrides.length)];
+      }
+      const fragColor = variedColor(baseColor);
+
+      const material = new THREE.MeshStandardMaterial({
+        color: fragColor,
+        transparent: true,
+        opacity: 1,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(position);
+
+      const angle = Math.random() * Math.PI * 2;
+      const spread = CONFIG.fragmentSpread * 1.5;
+      const vx = Math.cos(angle) * (Math.random() * spread);
+      const vy = Math.random() * 1.0; // near-zero vertical
+      const vz = Math.sin(angle) * (Math.random() * spread);
+
+      mesh.rotation.set(
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+      );
+
+      const rotSpeed = new THREE.Vector3(
+        (Math.random() - 0.5) * 16,
+        (Math.random() - 0.5) * 16,
+        (Math.random() - 0.5) * 16,
+      );
+
+      this.scene.add(mesh);
+
+      this.fragments.push({
+        mesh,
+        velocity: new THREE.Vector3(vx, vy, vz),
+        rotSpeed,
+        lifetime: CONFIG.fragmentLifetime,
+        age: 0,
+        bounced: false,
+        initialScale: 1,
+      });
+    }
+  }
+
   update(dt: number): void {
     for (let i = this.fragments.length - 1; i >= 0; i--) {
       const frag = this.fragments[i];

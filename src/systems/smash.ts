@@ -98,6 +98,9 @@ export class SmashSystem {
     return group;
   }
 
+  showHammer(): void { this.hammer.visible = true; }
+  hideHammer(): void { this.hammer.visible = false; }
+
   /** Set charge multiplier before calling execute() */
   setChargeMultiplier(mul: number): void {
     this.pendingChargeMultiplier = mul;

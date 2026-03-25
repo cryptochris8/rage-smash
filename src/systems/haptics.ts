@@ -1,7 +1,7 @@
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 export class HapticsSystem {
-  private enabled = true;
+  private enabled = localStorage.getItem('rage-smash-haptics') !== 'off';
 
   // Impact feedback on smash
   async impact(): Promise<void> {

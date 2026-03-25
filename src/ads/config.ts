@@ -56,20 +56,55 @@ const TEST_IDS = {
   },
 };
 
-// ⚠️  Replace these with your real AdMob ad unit IDs from https://admob.google.com
+/** Production ad unit IDs — set via environment variables or replace inline.
+ *  Create ad units at https://admob.google.com → Apps → Ad units.
+ *
+ *  Environment variables (in .env.production):
+ *    VITE_ADMOB_IOS_REWARDED=ca-app-pub-XXXX/XXXX
+ *    VITE_ADMOB_IOS_INTERSTITIAL=ca-app-pub-XXXX/XXXX
+ *    VITE_ADMOB_ANDROID_REWARDED=ca-app-pub-XXXX/XXXX
+ *    VITE_ADMOB_ANDROID_INTERSTITIAL=ca-app-pub-XXXX/XXXX
+ *    VITE_ADMOB_APP_ID_IOS=ca-app-pub-XXXX~XXXX
+ *    VITE_ADMOB_APP_ID_ANDROID=ca-app-pub-XXXX~XXXX
+ */
 const PRODUCTION_IDS = {
   ios: {
-    rewarded: 'ca-app-pub-XXXXX/XXXXX',       // TODO: replace before release
-    interstitial: 'ca-app-pub-XXXXX/XXXXX',    // TODO: replace before release
+    rewarded: import.meta.env.VITE_ADMOB_IOS_REWARDED ?? 'ca-app-pub-XXXXX/XXXXX',
+    interstitial: import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL ?? 'ca-app-pub-XXXXX/XXXXX',
   },
   android: {
-    rewarded: 'ca-app-pub-XXXXX/XXXXX',        // TODO: replace before release
-    interstitial: 'ca-app-pub-XXXXX/XXXXX',    // TODO: replace before release
+    rewarded: import.meta.env.VITE_ADMOB_ANDROID_REWARDED ?? 'ca-app-pub-XXXXX/XXXXX',
+    interstitial: import.meta.env.VITE_ADMOB_ANDROID_INTERSTITIAL ?? 'ca-app-pub-XXXXX/XXXXX',
   },
 };
 
-/** Set to true for production builds. Controls which ad unit IDs are used
- *  and whether AdMob initializes in testing mode. */
-export const AD_PRODUCTION = false; // TODO: flip to true before release
+/** true when running `vite build` (production mode). Controls which ad unit
+ *  IDs are used and whether AdMob initializes in testing mode. */
+export const AD_PRODUCTION = import.meta.env.PROD;
 
 export const ADMOB_IDS = AD_PRODUCTION ? PRODUCTION_IDS : TEST_IDS;
+
+export const ADMOB_APP_IDS = {
+  ios: import.meta.env.VITE_ADMOB_APP_ID_IOS ?? 'ca-app-pub-XXXXX~XXXXX',
+  android: import.meta.env.VITE_ADMOB_APP_ID_ANDROID ?? 'ca-app-pub-XXXXX~XXXXX',
+};
+
+function hasPlaceholder(id: string): boolean {
+  return id.includes('XXXXX');
+}
+
+export function validateAdIds(platform: 'ios' | 'android'): void {
+  if (!AD_PRODUCTION) return;
+  const ids = ADMOB_IDS[platform];
+  const appId = ADMOB_APP_IDS[platform];
+  const warnings: string[] = [];
+  if (hasPlaceholder(ids.rewarded)) warnings.push(`${platform} rewarded ad ID`);
+  if (hasPlaceholder(ids.interstitial)) warnings.push(`${platform} interstitial ad ID`);
+  if (hasPlaceholder(appId)) warnings.push(`${platform} AdMob app ID`);
+  if (warnings.length > 0) {
+    console.error(
+      `[AdMob] PRODUCTION BUILD with placeholder IDs! Replace: ${warnings.join(', ')}. ` +
+      `Set VITE_ADMOB_* env vars in .env.production or update src/ads/config.ts.`
+    );
+  }
+}

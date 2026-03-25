@@ -1,5 +1,5 @@
 import { AdProvider, RewardedPlacement, InterstitialPlacement } from './types';
-import { ADMOB_IDS, AD_PRODUCTION } from './config';
+import { ADMOB_IDS, AD_PRODUCTION, validateAdIds } from './config';
 import { adAnalytics } from './analytics';
 
 export class AdMobProvider implements AdProvider {
@@ -20,6 +20,7 @@ export class AdMobProvider implements AdProvider {
       // Request ATT authorization before initializing ads (iOS 14.5+)
       await this.requestTrackingAuthorization();
 
+      validateAdIds(this.platform);
       await AdMob.initialize({ initializeForTesting: !AD_PRODUCTION });
       console.log(`[AdMobProvider] Initialized (production=${AD_PRODUCTION})`);
     } catch (err) {

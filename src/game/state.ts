@@ -72,6 +72,10 @@ export interface GameState {
   totalPerfectHits: number;
   dailyStreak: number;
   jackpotBoostExpiresAt: number;
+  // Press bonus
+  pressActive: boolean;
+  pressProgress: number;
+  smashesSincePress: number;
 }
 
 export function createInitialState(): GameState {
@@ -107,6 +111,9 @@ export function createInitialState(): GameState {
     totalPerfectHits: 0,
     dailyStreak: 0,
     jackpotBoostExpiresAt: 0,
+    pressActive: false,
+    pressProgress: 0,
+    smashesSincePress: 0,
   };
 }
 

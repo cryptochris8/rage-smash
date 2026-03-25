@@ -164,4 +164,17 @@ export const CONFIG = {
 
   // --- Starting Coins ---
   startingCoins: 500,
+
+  // --- Press Bonus ---
+  pressEnabled: true,
+  pressSmashInterval: 10,
+  pressRestY: 3.5,
+  pressCrushY: 1.5,
+  pressDescentDuration: 0.4,
+  pressCrushDuration: 0.3,
+  pressRiseDuration: 0.3,
+  pressMultiplier: 3,
+  pressFragmentSpread: 4,
+  pressFragmentCount: 10,
+  pressPlateColor: 0x555555,
 } as const;

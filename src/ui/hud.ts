@@ -30,6 +30,7 @@ export class HUD {
     onDailyToggle?: () => void,
     onGiftToggle?: () => void,
     onBoostToggle?: () => void,
+    onSettingsToggle?: () => void,
   ) {
     this.container = container;
     this.store = store;
@@ -125,6 +126,38 @@ export class HUD {
       onMuteToggle();
     });
     this.root.appendChild(this.muteBtn);
+
+    // --- Bottom-left: Settings gear (next to mute) ---
+    if (onSettingsToggle) {
+      const settingsBtn = document.createElement('button');
+      settingsBtn.textContent = '\u2699\uFE0F';
+      Object.assign(settingsBtn.style, {
+        position: 'absolute',
+        bottom: '0',
+        left: '0',
+        margin: `0 0 calc(14px + env(safe-area-inset-bottom, 0px)) calc(70px + env(safe-area-inset-left, 0px))`,
+        minWidth: '48px',
+        minHeight: '48px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: '22px',
+        background: 'rgba(0,0,0,0.4)',
+        color: '#ffffff',
+        border: 'none',
+        borderRadius: '12px',
+        padding: '10px 16px',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'background 0.15s ease',
+      });
+      settingsBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        onSettingsToggle();
+      });
+      this.root.appendChild(settingsBtn);
+    }
 
     // --- Bottom-right: Gift button (login rewards) ---
     if (onGiftToggle) {

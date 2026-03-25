@@ -33,12 +33,17 @@ import { LeaderboardUI } from '../ui/leaderboard';
 import { ChargeBar } from '../ui/chargebar';
 import { LoginRewardUI } from '../ui/login-reward';
 import { StarterPackUI } from '../ui/starter-pack';
+import { PressSystem } from '../systems/press';
+import { PressHUD } from '../ui/press-hud';
 import { VoiceManager } from '../audio/VoiceManager';
 import { SessionGoalSystem } from '../systems/session-goals';
 import { RetentionChallengeSystem } from '../systems/retention-challenges';
 import { EventSystem } from '../systems/events';
 import { GoalsPanel } from '../ui/goals-panel';
 import { ProgressPrompt } from '../ui/progress-prompt';
+import { SettingsUI } from '../ui/settings';
+import { Tutorial } from '../ui/tutorial';
+import { GameAnalytics } from '../systems/analytics';
 import { OBJECTS } from '../content/objects';
 
 export class Game {
@@ -79,6 +84,11 @@ export class Game {
   private eventSystem: EventSystem;
   private goalsPanel: GoalsPanel;
   private progressPrompt: ProgressPrompt;
+  private pressSystem: PressSystem;
+  private pressHUD: PressHUD;
+  private settingsUI: SettingsUI;
+  private analytics: GameAnalytics;
+  private nextIsPress: boolean = false;
   private clock: THREE.Clock;
   private prevCoins: number = 0;
   private lastCombo: number = 1;
@@ -97,6 +107,9 @@ export class Game {
     this.saveSystem = new SaveSystem(this.store);
     this.saveSystem.load();
     this.saveSystem.autoSave();
+
+    // Analytics
+    this.analytics = new GameAnalytics();
 
     this.prevCoins = this.store.state.coins;
     this.lastCombo = this.store.state.combo;
@@ -158,6 +171,18 @@ export class Game {
       this.starterPackSystem,
       this.eventSystem,
     );
+    this.pressSystem = new PressSystem(
+      this.scene,
+      this.store,
+      this.smashableManager,
+      this.fragmentManager,
+      this.particleSystem,
+      this.audioManager,
+      this.adManager,
+      this.jackpotSystem,
+      this.starterPackSystem,
+      this.eventSystem,
+    );
     this.spawnSystem = new SpawnSystem(this.store, this.smashableManager);
 
     // Input — branches on chargeEnabled
@@ -189,6 +214,7 @@ export class Game {
       () => this.showDailyChallenge(),
       () => this.showLoginRewards(),
       () => this.onBoostTap(),
+      () => this.toggleSettings(),
     );
     this.shop = new Shop(container, this.store, (roomId) => {
       switchRoom(this.scene, roomId);
@@ -240,7 +266,11 @@ export class Game {
       },
     );
     this.progressPrompt = new ProgressPrompt(container);
+    this.pressHUD = new PressHUD(container, this.store);
     this.adPrompts = new AdPrompts(container, this.store, this.adManager, this.audioManager);
+    this.settingsUI = new SettingsUI(container, this.store, this.analytics, (enabled) => {
+      this.hapticsSystem.setEnabled(enabled);
+    });
 
     // Initial goals panel update
     this.updateGoalsPanel();
@@ -253,6 +283,10 @@ export class Game {
       if (coins > this.prevCoins) {
         const earned = coins - this.prevCoins;
         this.adManager.trackCoinsEarned(earned);
+        this.analytics.recordSmash();
+        this.analytics.recordCoins(earned);
+        this.analytics.recordCombo(combo);
+        this.analytics.recordStreak(streak);
         this.overlays.showCoinPopup(earned);
 
         // Scale shake intensity with combo level
@@ -346,6 +380,20 @@ export class Game {
     // Update gift notification
     this.hud.setGiftNotification(this.loginRewardSystem.canClaim());
 
+    // Tutorial for first-time players
+    if (Tutorial.shouldShow()) {
+      this.store.update({ canTap: false });
+      new Tutorial(container, () => {
+        this.store.update({ canTap: true });
+      });
+    }
+
+    // Save session on page unload
+    window.addEventListener('beforeunload', () => this.analytics.endSession());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.analytics.endSession();
+    });
+
     // Spawn first object and start loop
     this.spawnSystem.spawnNext();
     this.animate();
@@ -380,23 +428,59 @@ export class Game {
       : null;
     this.lastSmashRarity = objDef?.rarity ?? 'common';
 
-    this.smashSystem.execute();
-    this.hapticsSystem.impact();
-    this.timeScaleSystem.triggerSlowmo();
+    // Check if this smash should be a press bonus
+    if (this.nextIsPress && CONFIG.pressEnabled) {
+      this.nextIsPress = false;
+      this.smashSystem.hideHammer();
+      this.pressHUD.show();
+      this.pressSystem.execute();
+      this.hapticsSystem.impact();
+      // No setTimeout — PressSystem.update() handles timing and re-enables canTap
+      // Spawn next after press completes
+      const checkDone = () => {
+        if (!this.store.state.pressActive) {
+          this.smashSystem.showHammer();
+          this.pressHUD.hide();
+          if (this.inDailyChallenge) {
+            this.handleDailySmash();
+          } else {
+            this.spawnSystem.spawnNext();
+          }
+        } else {
+          setTimeout(checkDone, 50);
+        }
+      };
+      setTimeout(checkDone, 100);
+    } else {
+      this.smashSystem.execute();
+      this.hapticsSystem.impact();
+      this.timeScaleSystem.triggerSlowmo();
+
+      const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
+      const delay = (CONFIG.smashDuration + CONFIG.spawnDelay) * speedMul * 1000;
+      setTimeout(() => {
+        if (this.inDailyChallenge) {
+          this.handleDailySmash();
+        } else {
+          this.spawnSystem.spawnNext();
+        }
+      }, delay);
+    }
 
     if (!this.inDailyChallenge) {
       this.adManager.onSmash();
     }
 
-    const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
-    const delay = (CONFIG.smashDuration + CONFIG.spawnDelay) * speedMul * 1000;
-    setTimeout(() => {
-      if (this.inDailyChallenge) {
-        this.handleDailySmash();
+    // Track press counter
+    if (CONFIG.pressEnabled && !this.inDailyChallenge) {
+      const newCount = this.store.state.smashesSincePress + 1;
+      if (newCount >= CONFIG.pressSmashInterval) {
+        this.store.update({ smashesSincePress: 0 });
+        this.nextIsPress = true;
       } else {
-        this.spawnSystem.spawnNext();
+        this.store.update({ smashesSincePress: newCount });
       }
-    }, delay);
+    }
   }
 
   // --- Charge mode ---
@@ -447,25 +531,59 @@ export class Game {
       : null;
     this.lastSmashRarity = objDef?.rarity ?? 'common';
 
-    // Successful charge release → smash
-    this.smashSystem.setChargeMultiplier(result.multiplier);
-    this.smashSystem.execute();
-    this.hapticsSystem.impact();
-    this.timeScaleSystem.triggerSlowmo();
+    // Check if this smash should be a press bonus
+    if (this.nextIsPress && CONFIG.pressEnabled) {
+      this.nextIsPress = false;
+      this.smashSystem.hideHammer();
+      this.pressHUD.show();
+      this.pressSystem.execute();
+      this.hapticsSystem.impact();
+      const checkDone = () => {
+        if (!this.store.state.pressActive) {
+          this.smashSystem.showHammer();
+          this.pressHUD.hide();
+          if (this.inDailyChallenge) {
+            this.handleDailySmash();
+          } else {
+            this.spawnSystem.spawnNext();
+          }
+        } else {
+          setTimeout(checkDone, 50);
+        }
+      };
+      setTimeout(checkDone, 100);
+    } else {
+      // Successful charge release → smash
+      this.smashSystem.setChargeMultiplier(result.multiplier);
+      this.smashSystem.execute();
+      this.hapticsSystem.impact();
+      this.timeScaleSystem.triggerSlowmo();
+
+      const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
+      const delay = (CONFIG.smashDuration + CONFIG.spawnDelay) * speedMul * 1000;
+      setTimeout(() => {
+        if (this.inDailyChallenge) {
+          this.handleDailySmash();
+        } else {
+          this.spawnSystem.spawnNext();
+        }
+      }, delay);
+    }
 
     if (!this.inDailyChallenge) {
       this.adManager.onSmash();
     }
 
-    const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
-    const delay = (CONFIG.smashDuration + CONFIG.spawnDelay) * speedMul * 1000;
-    setTimeout(() => {
-      if (this.inDailyChallenge) {
-        this.handleDailySmash();
+    // Track press counter
+    if (CONFIG.pressEnabled && !this.inDailyChallenge) {
+      const newCount = this.store.state.smashesSincePress + 1;
+      if (newCount >= CONFIG.pressSmashInterval) {
+        this.store.update({ smashesSincePress: 0 });
+        this.nextIsPress = true;
       } else {
-        this.spawnSystem.spawnNext();
+        this.store.update({ smashesSincePress: newCount });
       }
-    }, delay);
+    }
   }
 
   private onChargeCancel() {
@@ -610,7 +728,7 @@ export class Game {
     this.dailyUI.hide();
   }
 
-  // --- Shop / Mute ---
+  // --- Shop / Mute / Settings ---
 
   private toggleShop() {
     this.audioManager.playUIButton();
@@ -623,6 +741,15 @@ export class Game {
 
   private toggleMute() {
     this.store.update({ muted: !this.store.state.muted });
+  }
+
+  private toggleSettings() {
+    this.audioManager.playUIButton();
+    if (this.settingsUI.isOpen()) {
+      this.settingsUI.hide();
+    } else {
+      this.settingsUI.show();
+    }
   }
 
   // --- Session-End Ad Offers ---
@@ -694,6 +821,7 @@ export class Game {
     this.fragmentManager.update(dt);
     this.particleSystem.update(dt);
     this.smashSystem.update(dt);
+    this.pressSystem.update(dt);
 
     this.renderer.render(this.scene, this.camera);
   }
