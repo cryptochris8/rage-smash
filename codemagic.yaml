@@ -3,12 +3,15 @@ workflows:
     name: iOS Build
     max_build_duration: 30
     instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic  # Name of your App Store Connect API key in Codemagic UI
     environment:
       node: 20
       xcode: latest
       cocoapods: default
-      groups:
-        - app_store_credentials  # Configure in Codemagic UI
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.athletedomains.ragesmash
       vars:
         BUNDLE_ID: "com.athletedomains.ragesmash"
     scripts:
