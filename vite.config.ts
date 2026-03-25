@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   server: {
@@ -6,5 +7,11 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        play: resolve(__dirname, 'play/index.html'),
+      },
+    },
   },
 });
