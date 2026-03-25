@@ -26,9 +26,16 @@ function variedParticleColor(baseColor: number): THREE.Color {
 
 const DRAG_FACTOR = 0.95;
 
+interface Shockwave {
+  mesh: THREE.Mesh;
+  age: number;
+  lifetime: number;
+}
+
 export class ParticleSystem {
   private scene: THREE.Scene;
   private particles: Particle[] = [];
+  private shockwaves: Shockwave[] = [];
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -165,6 +172,26 @@ export class ParticleSystem {
     }
   }
 
+  /** Expanding shockwave ring on impact */
+  emitShockwave(position: THREE.Vector3, color?: number): void {
+    const geometry = new THREE.RingGeometry(0.05, 0.15, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: color ?? 0xffffff,
+      transparent: true,
+      opacity: 0.8,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(position);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.scale.setScalar(0.1);
+
+    this.scene.add(mesh);
+    this.shockwaves.push({ mesh, age: 0, lifetime: 0.35 });
+  }
+
   /** Large gold particles for jackpot event */
   emitJackpotBurst(position: THREE.Vector3): void {
     const count = CONFIG.jackpotParticleCount;
@@ -242,6 +269,27 @@ export class ParticleSystem {
         scale = particle.baseScale * (1 - (lifeRatio - 0.2) / 0.8);
       }
       particle.mesh.scale.setScalar(Math.max(scale, 0));
+    }
+
+    // Update shockwaves
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const sw = this.shockwaves[i];
+      sw.age += dt;
+
+      if (sw.age >= sw.lifetime) {
+        this.scene.remove(sw.mesh);
+        sw.mesh.geometry.dispose();
+        (sw.mesh.material as THREE.Material).dispose();
+        this.shockwaves.splice(i, 1);
+        continue;
+      }
+
+      const t = sw.age / sw.lifetime;
+      // Expand from small to large
+      const scale = 0.1 + t * 4;
+      sw.mesh.scale.setScalar(scale);
+      // Fade out
+      (sw.mesh.material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - t * t);
     }
   }
 }

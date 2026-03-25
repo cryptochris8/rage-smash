@@ -469,6 +469,70 @@ export class Overlays {
     requestAnimationFrame(animate);
   }
 
+  /** Flash "NEW BEST!" when beating best combo */
+  showNewBest(): void {
+    const el = document.createElement('div');
+    el.textContent = 'NEW BEST!';
+    Object.assign(el.style, {
+      position: 'absolute',
+      left: '50%',
+      top: '28%',
+      transform: 'translate(-50%, -50%) scale(0.3)',
+      fontSize: '28px',
+      fontWeight: '900',
+      color: '#00ff88',
+      textShadow: '0 0 20px rgba(0,255,136,0.8), 0 0 40px rgba(0,255,136,0.4), 0 2px 8px rgba(0,0,0,0.5)',
+      pointerEvents: 'none',
+      zIndex: '55',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      opacity: '0',
+      willChange: 'transform, opacity',
+      letterSpacing: '3px',
+    });
+
+    this.container.appendChild(el);
+
+    const duration = 900;
+    const start = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+
+      let scale: number;
+      let opacity: number;
+
+      if (t < 0.15) {
+        const tIn = t / 0.15;
+        const ease = 1 - Math.pow(1 - tIn, 3);
+        scale = 0.3 + 1.0 * ease;
+        opacity = ease;
+      } else if (t < 0.4) {
+        const tSettle = (t - 0.15) / 0.25;
+        scale = 1.3 - 0.3 * tSettle;
+        opacity = 1;
+      } else {
+        const tOut = (t - 0.4) / 0.6;
+        scale = 1.0;
+        opacity = 1 - tOut * tOut;
+      }
+
+      el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      el.style.opacity = String(Math.max(0, opacity));
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        el.remove();
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+
   /** Toast: "Great hit! Double your coins?" — tappable, auto-dismiss 2s */
   showBoostSuggestion(onAccept: () => void): void {
     const el = document.createElement('div');

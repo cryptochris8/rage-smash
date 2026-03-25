@@ -97,6 +97,9 @@ export class Game {
   private container: HTMLElement;
   private lastSmashPower: number = 1;
   private lastSmashRarity: string = 'common';
+  private lastBestCombo: number = 1;
+  private streakIdleTimer: number = 0;
+  private readonly streakTimeoutSec: number = 4;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -114,6 +117,7 @@ export class Game {
     this.prevCoins = this.store.state.coins;
     this.lastCombo = this.store.state.combo;
     this.lastStreak = this.store.state.streak;
+    this.lastBestCombo = this.store.state.bestCombo;
 
     // Rendering
     this.renderer = createRenderer(container);
@@ -277,10 +281,11 @@ export class Game {
 
     // React to state changes for juice effects
     this.store.subscribe(() => {
-      const { coins, combo, streak, jackpotActive, jackpotMultiplier } = this.store.state;
+      const { coins, combo, streak, bestCombo, jackpotActive, jackpotMultiplier } = this.store.state;
 
       // Coin popup + screen shake + flash + zoom punch on earn
       if (coins > this.prevCoins) {
+        this.streakIdleTimer = 0;
         const earned = coins - this.prevCoins;
         this.adManager.trackCoinsEarned(earned);
         this.analytics.recordSmash();
@@ -366,15 +371,22 @@ export class Game {
       if (streak > this.lastStreak) {
         this.overlays.showComboLabel(streak);
 
-        // Confetti burst at combo milestones
+        // Confetti burst + success haptic at combo milestones
         if ((CONFIG.confettiComboThresholds as number[]).includes(streak)) {
           this.particleSystem.emitConfetti();
+          this.hapticsSystem.notifySuccess();
         }
       }
       this.lastStreak = streak;
 
       // Streak heat lighting
       this.updateStreakHeat(streak);
+
+      // "NEW BEST!" when beating personal best combo
+      if (bestCombo > this.lastBestCombo && bestCombo > 1) {
+        this.overlays.showNewBest();
+      }
+      this.lastBestCombo = bestCombo;
     });
 
     // Update gift notification
@@ -485,7 +497,7 @@ export class Game {
 
   // --- Charge mode ---
 
-  private onChargeStart() {
+  private onChargeStart(): void {
     const { canTap, isSmashing, shopOpen } = this.store.state;
     if (!canTap || isSmashing || shopOpen) return;
 
@@ -500,11 +512,14 @@ export class Game {
 
     const result = this.chargeSystem.releaseCharge();
 
+    this.hapticsSystem.resetChargeBuzz();
+
     if (!result.success) {
       // Overcharge fail
       this.audioManager.playOverchargeFail();
       this.overlays.showOvercharge();
       this.voiceManager.playFailVoice();
+      this.hapticsSystem.notifyError();
       this.store.update({ streak: 0, combo: 1 });
       this.lastStreak = 0;
       this.lastCombo = 1;
@@ -556,7 +571,7 @@ export class Game {
       // Successful charge release → smash
       this.smashSystem.setChargeMultiplier(result.multiplier);
       this.smashSystem.execute();
-      this.hapticsSystem.impact();
+      this.hapticsSystem.impact(chargePower);
       this.timeScaleSystem.triggerSlowmo();
 
       const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
@@ -811,6 +826,18 @@ export class Game {
     // Charge system uses raw dt (fills at real-time rate)
     if (CONFIG.chargeEnabled) {
       this.chargeSystem.update(rawDt);
+      this.hapticsSystem.updateChargeBuzz(rawDt, this.store.state.chargeLevel);
+    }
+
+    // Streak idle timeout: reset combo if no smash for N seconds
+    if (this.store.state.streak > 0 && !this.store.state.isSmashing && !this.store.state.isCharging) {
+      this.streakIdleTimer += rawDt;
+      if (this.streakIdleTimer >= this.streakTimeoutSec) {
+        this.store.update({ streak: 0, combo: 1 });
+        this.lastStreak = 0;
+        this.lastCombo = 1;
+        this.streakIdleTimer = 0;
+      }
     }
 
     // Ad system uses raw dt (countdown in real time)

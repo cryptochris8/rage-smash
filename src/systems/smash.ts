@@ -164,14 +164,17 @@ export class SmashSystem {
     const def = currentObjectId ? OBJECTS.find((o) => o.id === currentObjectId) : null;
     const theme = def?.particleTheme;
 
-    // Scale fragment count by charge level
+    // Scale fragment count by charge level and combo streak
     const chargeMul = this.pendingChargeMultiplier;
-    const extraFragments = chargeMul > 1 ? Math.floor((chargeMul - 1) * 4) : 0;
+    const chargeExtra = chargeMul > 1 ? Math.floor((chargeMul - 1) * 4) : 0;
+    const streakExtra = Math.floor(this.store.state.streak / 5);
+    const extraFragments = chargeExtra + streakExtra;
 
     // Visual effects
     this.fragmentManager.explode(position, color, extraFragments, def?.color ? [color] : undefined);
     this.particleSystem.emit(position, color, theme);
     this.particleSystem.emitCoinBurst(position);
+    this.particleSystem.emitShockwave(position, color);
 
     // Economy
     const state = this.store.state;

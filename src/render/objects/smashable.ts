@@ -411,7 +411,9 @@ export class SmashableManager {
         this.animProgress = 1;
       }
 
-      const t = 1 - Math.pow(1 - this.animProgress, 3);
+      // Elastic ease-out: overshoot to ~1.1 then settle to 1.0
+      const p = this.animProgress;
+      const t = p === 1 ? 1 : 1 - Math.pow(2, -10 * p) * Math.cos((p * 10 - 0.75) * ((2 * Math.PI) / 3));
 
       this.currentGroup.scale.set(
         this.targetScale.x * t,

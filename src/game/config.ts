@@ -17,7 +17,7 @@ export const CONFIG = {
   fragmentSpread: 3,
   fragmentGravity: -9.8,
   spawnDelay: 0.3,
-  spawnAnimDuration: 0.2,
+  spawnAnimDuration: 0.35,
 
   // Rendering
   maxFragments: 30,
