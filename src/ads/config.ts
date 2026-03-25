@@ -69,8 +69,8 @@ const TEST_IDS = {
  */
 const PRODUCTION_IDS = {
   ios: {
-    rewarded: import.meta.env.VITE_ADMOB_IOS_REWARDED ?? 'ca-app-pub-XXXXX/XXXXX',
-    interstitial: import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL ?? 'ca-app-pub-XXXXX/XXXXX',
+    rewarded: import.meta.env.VITE_ADMOB_IOS_REWARDED ?? 'ca-app-pub-7575845069047315/2762961600',
+    interstitial: import.meta.env.VITE_ADMOB_IOS_INTERSTITIAL ?? 'ca-app-pub-7575845069047315/9384210278',
   },
   android: {
     rewarded: import.meta.env.VITE_ADMOB_ANDROID_REWARDED ?? 'ca-app-pub-XXXXX/XXXXX',
@@ -85,7 +85,7 @@ export const AD_PRODUCTION = import.meta.env.PROD;
 export const ADMOB_IDS = AD_PRODUCTION ? PRODUCTION_IDS : TEST_IDS;
 
 export const ADMOB_APP_IDS = {
-  ios: import.meta.env.VITE_ADMOB_APP_ID_IOS ?? 'ca-app-pub-XXXXX~XXXXX',
+  ios: import.meta.env.VITE_ADMOB_APP_ID_IOS ?? 'ca-app-pub-7575845069047315~4898170353',
   android: import.meta.env.VITE_ADMOB_APP_ID_ANDROID ?? 'ca-app-pub-XXXXX~XXXXX',
 };
 

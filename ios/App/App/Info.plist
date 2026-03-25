@@ -50,7 +50,7 @@
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This allows us to show you relevant ads and support free gameplay.</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-XXXXX~XXXXX</string>
+	<string>ca-app-pub-7575845069047315~4898170353</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

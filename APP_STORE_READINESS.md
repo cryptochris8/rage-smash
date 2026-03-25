@@ -1,12 +1,12 @@
 # Rage Smash — App Store Readiness
 
-## Status: ~90% Ready
+## Status: ~95% Ready
 
 ### Resolved
-- [x] Bundle ID synced to `com.ragesmash.app` across iOS + Android + CI/CD
+- [x] Bundle ID synced to `com.athletedomains.ragesmash` across iOS + Android + CI/CD
 - [x] App name synced to "Rage Smash" across iOS + Android
 - [x] Privacy manifest (`PrivacyInfo.xcprivacy`) created
-- [x] Android MainActivity moved to `com.ragesmash.app` package
+- [x] Android MainActivity moved to `com.athletedomains.ragesmash` package
 - [x] Splash screen configured (3 scales)
 - [x] Version set to 1.0 / build 1
 - [x] App icon source (1024x1024) in Xcode asset catalog (single-size format)
@@ -14,22 +14,21 @@
 - [x] AdMob testing mode tied to `AD_PRODUCTION` flag (auto-disables for release)
 - [x] ATT (App Tracking Transparency) consent flow in AdMobProvider
 - [x] `NSUserTrackingUsageDescription` added to Info.plist
-- [x] `GADApplicationIdentifier` placeholder added to Info.plist
+- [x] `GADApplicationIdentifier` set to real iOS AdMob app ID in Info.plist
 - [x] `SKAdNetworkItems` added to Info.plist (Google SKAdNetwork ID)
 - [x] AdMob native dependency added to iOS Package.swift
 - [x] Release xcconfig created (`CAPACITOR_DEBUG = false`)
 - [x] Release build configurations linked to `release.xcconfig` in Xcode project
-- [x] Codemagic CI/CD bundle ID fixed to `com.ragesmash.app`
+- [x] Codemagic CI/CD bundle ID fixed to `com.athletedomains.ragesmash`
 - [x] Audio/voice all local files, no API calls
+- [x] iOS AdMob ad unit IDs configured (rewarded + interstitial)
+- [x] Privacy policy written (`public/privacy.html`)
 
 ### Before Submission (manual steps)
-- [ ] **AdMob Account**: Create AdMob account, get real ad unit IDs, replace `ca-app-pub-XXXXX` placeholders in:
-  - `src/ads/config.ts` — `PRODUCTION_IDS` object
-  - `ios/App/App/Info.plist` — `GADApplicationIdentifier`
-- [ ] **Flip AD_PRODUCTION**: Set `AD_PRODUCTION = true` in `src/ads/config.ts`
-- [ ] **Code Signing**: Set Team ID in Xcode, enable automatic signing
-- [ ] **Privacy Policy URL**: Write policy, host publicly, add URL to App Store Connect
-- [ ] **App Store Connect**: Create app listing, upload screenshots, write description
+- [ ] **Android AdMob**: Create Android app in AdMob, get ad unit IDs, replace placeholders
+- [ ] **Code Signing**: Configure signing credentials in Codemagic UI
+- [ ] **Privacy Policy URL**: Host `privacy.html` publicly, add URL to App Store Connect
+- [ ] **App Store Connect**: Upload screenshots, write description
 - [ ] **Physical Device Testing**: Test on real iPhone before submission
 - [ ] **PrivacyInfo.xcprivacy**: Verify it appears in Xcode "Copy Bundle Resources" build phase
 

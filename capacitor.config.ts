@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.ragesmash.app',
+  appId: 'com.athletedomains.ragesmash',
   appName: 'Rage Smash',
   webDir: 'dist',
   server: {

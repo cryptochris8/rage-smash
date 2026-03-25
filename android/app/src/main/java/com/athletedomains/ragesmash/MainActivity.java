@@ -1,4 +1,4 @@
-package com.ragesmash.app;
+package com.athletedomains.ragesmash;
 
 import com.getcapacitor.BridgeActivity;
 
