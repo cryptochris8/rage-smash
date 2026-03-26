@@ -124,7 +124,7 @@ export class StarterPackUI {
 
     // Buy button
     const buyBtn = document.createElement('button');
-    buyBtn.textContent = 'BUY $1.99';
+    buyBtn.textContent = 'CLAIM FREE';
     Object.assign(buyBtn.style, {
       display: 'block',
       width: '100%',
