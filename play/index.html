@@ -20,10 +20,94 @@
       width: 100%; height: 100%; position: relative;
     }
     canvas { display: block; width: 100%; height: 100%; }
+
+    /* Download banner — web only */
+    .dl-banner {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 999;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      background: linear-gradient(135deg, rgba(17,17,24,0.95), rgba(26,26,46,0.95));
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(255,221,87,0.15);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .dl-banner.visible { display: flex; }
+    .dl-banner-icon {
+      width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    }
+    .dl-banner-text {
+      flex: 1; min-width: 0;
+    }
+    .dl-banner-title {
+      font-size: 14px; font-weight: 700; color: #fff;
+    }
+    .dl-banner-sub {
+      font-size: 11px; color: rgba(255,255,255,0.5);
+    }
+    .dl-banner-btn {
+      flex-shrink: 0;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #ff4400, #ff6622);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .dl-banner-close {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.4);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px 8px;
+      -webkit-tap-highlight-color: transparent;
+    }
   </style>
 </head>
 <body>
   <div id="app"></div>
+
+  <!-- Download banner (web browser only) -->
+  <div class="dl-banner" id="dl-banner">
+    <img src="/models/app-icon/rage-smash.png" alt="Rage Smash" class="dl-banner-icon" />
+    <div class="dl-banner-text">
+      <div class="dl-banner-title">Rage Smash</div>
+      <div class="dl-banner-sub">Haptics, offline play & more on the app</div>
+    </div>
+    <a href="https://apps.apple.com/app/rage-smash/id6760738319" class="dl-banner-btn">GET</a>
+    <button class="dl-banner-close" id="dl-banner-close">&times;</button>
+  </div>
+
+  <script>
+    // Only show banner on web, not inside native Capacitor app
+    (function() {
+      var isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+      if (!isNative) {
+        var banner = document.getElementById('dl-banner');
+        // Show after 30 seconds of play
+        setTimeout(function() {
+          banner.classList.add('visible');
+        }, 30000);
+        document.getElementById('dl-banner-close').addEventListener('click', function() {
+          banner.classList.remove('visible');
+        });
+      }
+    })();
+  </script>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
