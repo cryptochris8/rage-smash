@@ -21,6 +21,9 @@ workflows:
       - name: Build web app
         script: |
           npm run build
+      - name: Swap landing page for game page (native app)
+        script: |
+          cp dist/play/index.html dist/index.html
       - name: Sync Capacitor iOS
         script: |
           npx cap sync ios
@@ -59,6 +62,9 @@ workflows:
       - name: Build web app
         script: |
           npm run build
+      - name: Swap landing page for game page (native app)
+        script: |
+          cp dist/play/index.html dist/index.html
       - name: Sync Capacitor Android
         script: |
           npx cap sync android
