@@ -26,8 +26,8 @@
 
 ### Before Submission (manual steps)
 - [ ] **Android AdMob**: Create Android app in AdMob, get ad unit IDs, replace placeholders
-- [ ] **Code Signing**: Configure signing credentials in Codemagic UI
-- [ ] **Privacy Policy URL**: Host `privacy.html` publicly, add URL to App Store Connect
+- [x] **Code Signing**: Codemagic integration `Codemagic-Rage-Smash` configured with App Store Connect API key
+- [x] **Privacy Policy URL**: Hosted on Netlify, add URL to App Store Connect
 - [ ] **App Store Connect**: Upload screenshots, write description
 - [ ] **Physical Device Testing**: Test on real iPhone before submission
 - [ ] **PrivacyInfo.xcprivacy**: Verify it appears in Xcode "Copy Bundle Resources" build phase
