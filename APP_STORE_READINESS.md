@@ -1,6 +1,6 @@
 # Rage Smash — App Store Readiness
 
-## Status: ~95% Ready
+## Status: SUBMITTED FOR REVIEW
 
 ### Resolved
 - [x] Bundle ID synced to `com.athletedomains.ragesmash` across iOS + Android + CI/CD
