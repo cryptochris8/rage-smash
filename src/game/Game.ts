@@ -400,6 +400,14 @@ export class Game {
       });
     }
 
+    // Eagerly unlock audio on first touch so buffers preload before first smash
+    const earlyUnlock = () => {
+      this.audioManager.unlock();
+      this.voiceManager.setAudioContext(this.audioManager.getContext()!);
+      container.removeEventListener('pointerdown', earlyUnlock);
+    };
+    container.addEventListener('pointerdown', earlyUnlock);
+
     // Save session on page unload
     window.addEventListener('beforeunload', () => this.analytics.endSession());
     document.addEventListener('visibilitychange', () => {

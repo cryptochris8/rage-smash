@@ -19,6 +19,7 @@ export class AudioManager {
   private buffers: Map<SoundKey, AudioBuffer> = new Map();
   private activeSources: number = 0;
   private loaded = false;
+  private loadPromise: Promise<void> | null = null;
 
   constructor(store: Store) {
     this.store = store;
@@ -30,14 +31,23 @@ export class AudioManager {
     return this.ctx;
   }
 
+  isLoaded(): boolean {
+    return this.loaded;
+  }
+
   unlock(): void {
     if (!this.ctx) {
       this.ctx = new AudioContext();
-      this.preload();
+      this.loadPromise = this.preload();
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+  }
+
+  /** Wait for all audio buffers to be loaded */
+  async waitForLoad(): Promise<void> {
+    if (this.loadPromise) await this.loadPromise;
   }
 
   private async preload(): Promise<void> {
@@ -81,7 +91,13 @@ export class AudioManager {
     if (this.activeSources >= AUDIO_CONFIG.maxSimultaneous) return;
 
     const buffer = this.buffers.get(key);
-    if (!buffer) return;
+    if (!buffer) {
+      // Procedural fallback while audio is still loading
+      if (!this.loaded && key === 'impact-hammer') {
+        this.playProcedural('impact', { freq: 180, duration: 0.08, volume: 0.4, waveform: 'triangle' });
+      }
+      return;
+    }
 
     const ctx = this.ctx;
     const startTime = ctx.currentTime + delayMs / 1000;
