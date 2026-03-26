@@ -73,6 +73,8 @@ export class AdManager implements IAdSystem {
   // --- Rewarded API ---
 
   canShowRewarded(placement: RewardedPlacement): boolean {
+    // No ads available on web (stub provider)
+    if (this.provider.name === 'StubProvider') return false;
     // Can't show if a reward is currently active (for boost placements)
     if (this.rewardActive && (placement === 'boost_2x_main' || placement === 'jackpot_bonus')) {
       return false;
@@ -130,6 +132,7 @@ export class AdManager implements IAdSystem {
   // --- Interstitial API ---
 
   shouldShowInterstitial(): boolean {
+    if (this.provider.name === 'StubProvider') return false;
     if (this.isFirstSession && INTERSTITIAL_GATING.firstSessionProtected) return false;
     const sessionElapsed = (Date.now() - this.sessionStartTime) / 1000;
     if (sessionElapsed < INTERSTITIAL_GATING.minSessionLengthSec) return false;

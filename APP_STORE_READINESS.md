@@ -29,7 +29,7 @@
 - [x] **Code Signing**: Codemagic integration `Codemagic-Rage-Smash` configured with App Store Connect API key
 - [x] **Privacy Policy URL**: Hosted on Netlify, add URL to App Store Connect
 - [ ] **App Store Connect**: Upload screenshots, write description
-- [ ] **Physical Device Testing**: Test on real iPhone before submission
+- [x] **Physical Device Testing**: Verified via TestFlight on real iPhone
 - [ ] **PrivacyInfo.xcprivacy**: Verify it appears in Xcode "Copy Bundle Resources" build phase
 
 ### Optional (post-launch)
