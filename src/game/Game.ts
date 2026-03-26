@@ -274,6 +274,10 @@ export class Game {
     this.adPrompts = new AdPrompts(container, this.store, this.adManager, this.audioManager);
     this.settingsUI = new SettingsUI(container, this.store, this.analytics, (enabled) => {
       this.hapticsSystem.setEnabled(enabled);
+    }, () => {
+      // Stub IAP — replace with StoreKit 2 in v1.1
+      this.store.update({ adsRemoved: true });
+      this.audioManager.playDailyReward();
     });
 
     // Initial goals panel update

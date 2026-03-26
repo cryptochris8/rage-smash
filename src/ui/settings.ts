@@ -7,17 +7,20 @@ export class SettingsUI {
   private analytics: GameAnalytics;
   private overlay: HTMLDivElement | null = null;
   private onHapticsToggle: (enabled: boolean) => void;
+  private onRemoveAds: () => void;
 
   constructor(
     container: HTMLElement,
     store: Store,
     analytics: GameAnalytics,
     onHapticsToggle: (enabled: boolean) => void,
+    onRemoveAds?: () => void,
   ) {
     this.container = container;
     this.store = store;
     this.analytics = analytics;
     this.onHapticsToggle = onHapticsToggle;
+    this.onRemoveAds = onRemoveAds ?? (() => {});
   }
 
   show(): void {
@@ -100,6 +103,37 @@ export class SettingsUI {
       localStorage.setItem('rage-smash-haptics', on ? 'on' : 'off');
       this.onHapticsToggle(on);
     }));
+
+    // Remove Ads button (only show if ads not already removed and on native)
+    if (!this.store.state.adsRemoved) {
+      panel.appendChild(this.createDivider());
+      const removeAdsBtn = document.createElement('button');
+      removeAdsBtn.textContent = 'Remove Ads — $2.99';
+      Object.assign(removeAdsBtn.style, {
+        width: '100%',
+        padding: '14px',
+        fontSize: '15px',
+        fontWeight: '700',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+        color: '#a78bfa',
+        border: '1px solid rgba(139,92,246,0.3)',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        WebkitTapHighlightColor: 'transparent',
+      });
+      removeAdsBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        this.onRemoveAds();
+        // Update button after purchase
+        if (this.store.state.adsRemoved) {
+          removeAdsBtn.textContent = 'Ads Removed';
+          removeAdsBtn.style.opacity = '0.5';
+          removeAdsBtn.style.pointerEvents = 'none';
+        }
+      });
+      panel.appendChild(removeAdsBtn);
+    }
 
     // Divider
     panel.appendChild(this.createDivider());

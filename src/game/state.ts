@@ -76,6 +76,8 @@ export interface GameState {
   pressActive: boolean;
   pressProgress: number;
   smashesSincePress: number;
+  // IAP
+  adsRemoved: boolean;
 }
 
 export function createInitialState(): GameState {
@@ -114,6 +116,7 @@ export function createInitialState(): GameState {
     pressActive: false,
     pressProgress: 0,
     smashesSincePress: 0,
+    adsRemoved: false,
   };
 }
 
