@@ -45,6 +45,7 @@ import { SettingsUI } from '../ui/settings';
 import { Tutorial } from '../ui/tutorial';
 import { GameAnalytics } from '../systems/analytics';
 import { OBJECTS } from '../content/objects';
+import { StoreKitManager, PRODUCT_IDS } from '../iap/StoreKitManager';
 
 export class Game {
   private store: Store;
@@ -88,6 +89,7 @@ export class Game {
   private pressHUD: PressHUD;
   private settingsUI: SettingsUI;
   private analytics: GameAnalytics;
+  private storeKit: StoreKitManager;
   private nextIsPress: boolean = false;
   private clock: THREE.Clock;
   private prevCoins: number = 0;
@@ -114,6 +116,20 @@ export class Game {
 
     // Analytics
     this.analytics = new GameAnalytics();
+
+    // StoreKit IAP
+    this.storeKit = new StoreKitManager();
+    this.storeKit.init().then(() => {
+      // Verify entitlements on launch (handles reinstalls/new devices)
+      this.storeKit.checkEntitlements().then((entitlements) => {
+        if (entitlements.includes(PRODUCT_IDS.removeAds)) {
+          this.store.update({ adsRemoved: true });
+        }
+        if (entitlements.includes(PRODUCT_IDS.starterPack)) {
+          this.store.update({ starterPackPurchased: true });
+        }
+      });
+    }).catch((err) => console.warn('[Game] StoreKit init error:', err));
 
     this.prevCoins = this.store.state.coins;
     this.lastCombo = this.store.state.combo;
@@ -249,7 +265,7 @@ export class Game {
         setTimeout(() => this.adPrompts.showDailyBonusDouble(coins), 500);
       }
     });
-    this.starterPackUI = new StarterPackUI(container, this.store, this.starterPackSystem, this.audioManager);
+    this.starterPackUI = new StarterPackUI(container, this.store, this.starterPackSystem, this.audioManager, this.storeKit);
     this.goalsPanel = new GoalsPanel(
       container,
       this.store,
@@ -275,10 +291,27 @@ export class Game {
     this.adPrompts = new AdPrompts(container, this.store, this.adManager, this.audioManager);
     this.settingsUI = new SettingsUI(container, this.store, this.analytics, (enabled) => {
       this.hapticsSystem.setEnabled(enabled);
-    }, () => {
-      // Stub IAP — replace with StoreKit 2 in v1.1
-      this.store.update({ adsRemoved: true });
-      this.audioManager.playDailyReward();
+    }, async () => {
+      // Remove Ads IAP
+      const success = await this.storeKit.purchase(PRODUCT_IDS.removeAds);
+      if (success) {
+        this.store.update({ adsRemoved: true });
+        this.audioManager.playDailyReward();
+      }
+      return success;
+    }, async () => {
+      // Restore Purchases
+      const entitlements = await this.storeKit.restorePurchases();
+      const restored: string[] = [];
+      if (entitlements.includes(PRODUCT_IDS.removeAds)) {
+        this.store.update({ adsRemoved: true });
+        restored.push('Remove Ads');
+      }
+      if (entitlements.includes(PRODUCT_IDS.starterPack)) {
+        this.store.update({ starterPackPurchased: true });
+        restored.push('Starter Pack');
+      }
+      return restored;
     });
 
     // Initial goals panel update

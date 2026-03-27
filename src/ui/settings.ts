@@ -7,20 +7,23 @@ export class SettingsUI {
   private analytics: GameAnalytics;
   private overlay: HTMLDivElement | null = null;
   private onHapticsToggle: (enabled: boolean) => void;
-  private onRemoveAds: () => void;
+  private onRemoveAds: () => Promise<boolean>;
+  private onRestore: () => Promise<string[]>;
 
   constructor(
     container: HTMLElement,
     store: Store,
     analytics: GameAnalytics,
     onHapticsToggle: (enabled: boolean) => void,
-    onRemoveAds?: () => void,
+    onRemoveAds?: () => Promise<boolean>,
+    onRestore?: () => Promise<string[]>,
   ) {
     this.container = container;
     this.store = store;
     this.analytics = analytics;
     this.onHapticsToggle = onHapticsToggle;
-    this.onRemoveAds = onRemoveAds ?? (() => {});
+    this.onRemoveAds = onRemoveAds ?? (async () => false);
+    this.onRestore = onRestore ?? (async () => []);
   }
 
   show(): void {
@@ -104,9 +107,9 @@ export class SettingsUI {
       this.onHapticsToggle(on);
     }));
 
-    // Remove Ads button (only show if ads not already removed and on native)
+    // Remove Ads button (only show if ads not already removed)
+    panel.appendChild(this.createDivider());
     if (!this.store.state.adsRemoved) {
-      panel.appendChild(this.createDivider());
       const removeAdsBtn = document.createElement('button');
       removeAdsBtn.textContent = 'Remove Ads — $2.99';
       Object.assign(removeAdsBtn.style, {
@@ -122,18 +125,67 @@ export class SettingsUI {
         pointerEvents: 'auto',
         WebkitTapHighlightColor: 'transparent',
       });
-      removeAdsBtn.addEventListener('pointerdown', (e) => {
+      removeAdsBtn.addEventListener('pointerdown', async (e) => {
         e.stopPropagation();
-        this.onRemoveAds();
-        // Update button after purchase
-        if (this.store.state.adsRemoved) {
+        removeAdsBtn.textContent = 'Processing...';
+        removeAdsBtn.style.pointerEvents = 'none';
+        const success = await this.onRemoveAds();
+        if (success) {
           removeAdsBtn.textContent = 'Ads Removed';
           removeAdsBtn.style.opacity = '0.5';
-          removeAdsBtn.style.pointerEvents = 'none';
+        } else {
+          removeAdsBtn.textContent = 'Remove Ads — $2.99';
+          removeAdsBtn.style.pointerEvents = 'auto';
         }
       });
       panel.appendChild(removeAdsBtn);
+    } else {
+      const removedLabel = document.createElement('div');
+      removedLabel.textContent = 'Ads Removed';
+      Object.assign(removedLabel.style, {
+        width: '100%',
+        padding: '14px',
+        fontSize: '15px',
+        fontWeight: '700',
+        color: 'rgba(139,92,246,0.5)',
+        textAlign: 'center',
+      });
+      panel.appendChild(removedLabel);
     }
+
+    // Restore Purchases button
+    const restoreBtn = document.createElement('button');
+    restoreBtn.textContent = 'Restore Purchases';
+    Object.assign(restoreBtn.style, {
+      width: '100%',
+      padding: '12px',
+      fontSize: '14px',
+      fontWeight: '600',
+      background: 'rgba(255,255,255,0.06)',
+      color: 'rgba(255,255,255,0.5)',
+      border: 'none',
+      borderRadius: '10px',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      WebkitTapHighlightColor: 'transparent',
+      marginTop: '8px',
+    });
+    restoreBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      restoreBtn.textContent = 'Restoring...';
+      restoreBtn.style.pointerEvents = 'none';
+      const restored = await this.onRestore();
+      if (restored.length > 0) {
+        restoreBtn.textContent = `Restored: ${restored.join(', ')}`;
+      } else {
+        restoreBtn.textContent = 'No purchases to restore';
+      }
+      setTimeout(() => {
+        restoreBtn.textContent = 'Restore Purchases';
+        restoreBtn.style.pointerEvents = 'auto';
+      }, 2000);
+    });
+    panel.appendChild(restoreBtn);
 
     // Divider
     panel.appendChild(this.createDivider());

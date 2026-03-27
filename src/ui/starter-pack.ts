@@ -1,12 +1,14 @@
 import { Store } from '../game/state';
 import { StarterPackSystem } from '../systems/starter-pack';
 import { AudioManager } from '../audio/AudioManager';
+import { StoreKitManager, PRODUCT_IDS } from '../iap/StoreKitManager';
 
 export class StarterPackUI {
   private container: HTMLElement;
   private store: Store;
   private starterPack: StarterPackSystem;
   private audioManager: AudioManager;
+  private storeKit: StoreKitManager;
   private root: HTMLDivElement | null = null;
 
   constructor(
@@ -14,11 +16,13 @@ export class StarterPackUI {
     store: Store,
     starterPack: StarterPackSystem,
     audioManager: AudioManager,
+    storeKit?: StoreKitManager,
   ) {
     this.container = container;
     this.store = store;
     this.starterPack = starterPack;
     this.audioManager = audioManager;
+    this.storeKit = storeKit ?? new StoreKitManager();
   }
 
   show(): void {
@@ -124,7 +128,8 @@ export class StarterPackUI {
 
     // Buy button
     const buyBtn = document.createElement('button');
-    buyBtn.textContent = 'CLAIM FREE';
+    const displayPrice = this.storeKit.getDisplayPrice(PRODUCT_IDS.starterPack);
+    buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'CLAIM FREE';
     Object.assign(buyBtn.style, {
       display: 'block',
       width: '100%',
@@ -143,11 +148,27 @@ export class StarterPackUI {
       textShadow: '0 2px 4px rgba(0,0,0,0.3)',
       boxShadow: '0 4px 16px rgba(34,197,94,0.3)',
     });
-    buyBtn.addEventListener('pointerdown', (e) => {
+    buyBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
-      this.starterPack.purchase();
-      this.audioManager.playDailyReward();
-      this.hide();
+      if (this.storeKit.isAvailable()) {
+        // Real IAP
+        buyBtn.textContent = 'Processing...';
+        buyBtn.style.pointerEvents = 'none';
+        const success = await this.storeKit.purchase(PRODUCT_IDS.starterPack);
+        if (success) {
+          this.starterPack.purchase();
+          this.audioManager.playDailyReward();
+          this.hide();
+        } else {
+          buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'BUY $1.99';
+          buyBtn.style.pointerEvents = 'auto';
+        }
+      } else {
+        // Web fallback — free gift
+        this.starterPack.purchase();
+        this.audioManager.playDailyReward();
+        this.hide();
+      }
     });
     card.appendChild(buyBtn);
 
