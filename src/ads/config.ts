@@ -39,10 +39,10 @@ export const AD_PLACEMENTS: Record<RewardedPlacement, RewardConfig> = {
 };
 
 export const INTERSTITIAL_GATING: InterstitialGating = {
-  minSecondsBetween: 180,
-  minRoundsSinceLast: 3,
+  minSecondsBetween: 300,
+  minRoundsSinceLast: 10,
   firstSessionProtected: true,
-  minSessionLengthSec: 60,
+  minSessionLengthSec: 120,
 };
 
 const TEST_IDS = {

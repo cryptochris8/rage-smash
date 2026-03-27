@@ -138,7 +138,7 @@ export const CONFIG = {
   // --- Smart Boost ---
   smartBoostBigSmashThreshold: 30,
   smartBoostLowCoinThreshold: 50,
-  smartBoostCooldownMs: 60000,
+  smartBoostCooldownMs: 120000,
 
   // --- Upgrades ---
   upgradeBaseCost: 100,

@@ -166,9 +166,9 @@ export class AdManager implements IAdSystem {
     this.sessionSmashCount++;
   }
 
-  /** Returns true every 10 smashes since the last session-end bonus offer */
+  /** Returns true every 30 smashes since the last session-end bonus offer */
   shouldOfferSessionBonus(): boolean {
-    const smashInterval = 10;
+    const smashInterval = 30;
     if (this.sessionCoinsEarned <= 0) return false;
     if (!this.canShowRewarded('session_end_bonus')) return false;
     return this.sessionSmashCount - this.lastSessionBonusAt >= smashInterval;
