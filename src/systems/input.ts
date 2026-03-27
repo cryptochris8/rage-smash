@@ -12,9 +12,24 @@ export class InputSystem {
   constructor(element: HTMLElement, callbacks: InputCallbacks, chargeEnabled: boolean) {
     this.element = element;
 
+    // Check if a UI overlay is on top (any element with zIndex >= 100)
+    const isOverlayBlocking = (e: PointerEvent): boolean => {
+      const target = e.target as HTMLElement;
+      if (!target || target === element) return false;
+      // Walk up from the event target to see if it (or a parent) is a high-z overlay
+      let el: HTMLElement | null = target;
+      while (el && el !== element) {
+        const z = parseInt(el.style.zIndex || '0', 10);
+        if (z >= 100) return true;
+        el = el.parentElement;
+      }
+      return false;
+    };
+
     if (chargeEnabled && callbacks.onChargeStart && callbacks.onChargeRelease && callbacks.onChargeCancel) {
       const onDown = (e: PointerEvent) => {
         e.preventDefault();
+        if (isOverlayBlocking(e)) return;
         callbacks.onChargeStart!();
       };
       const onUp = (e: PointerEvent) => {
@@ -41,6 +56,7 @@ export class InputSystem {
       const onTap = callbacks.onTap;
       const handler = (e: PointerEvent) => {
         e.preventDefault();
+        if (isOverlayBlocking(e)) return;
         onTap();
       };
       element.addEventListener('pointerdown', handler, { passive: false });
