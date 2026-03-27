@@ -100,6 +100,7 @@ export class Game {
   private lastBestCombo: number = 1;
   private streakIdleTimer: number = 0;
   private readonly streakTimeoutSec: number = 4;
+  private lastEarnedCoins: number = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -291,6 +292,7 @@ export class Game {
       if (coins > this.prevCoins) {
         this.streakIdleTimer = 0;
         const earned = coins - this.prevCoins;
+        this.lastEarnedCoins = earned;
         this.adManager.trackCoinsEarned(earned);
         this.analytics.recordSmash();
         this.analytics.recordCoins(earned);
@@ -717,7 +719,8 @@ export class Game {
   }
 
   private handleDailySmash() {
-    const coinsEarned = this.store.state.coins - this.prevCoins;
+    const coinsEarned = this.lastEarnedCoins;
+    this.lastEarnedCoins = 0;
     const { done, result } = this.dailyChallenge.recordSmash(Math.max(0, coinsEarned));
     const challengeState = this.dailyChallenge.getState();
 
