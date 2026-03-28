@@ -45,6 +45,13 @@ export class AudioManager {
     }
   }
 
+  /** Resume audio context if suspended (e.g. after ad overlay or background) */
+  resume(): void {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
   /** Wait for all audio buffers to be loaded */
   async waitForLoad(): Promise<void> {
     if (this.loadPromise) await this.loadPromise;

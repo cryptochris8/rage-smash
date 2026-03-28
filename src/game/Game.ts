@@ -450,7 +450,12 @@ export class Game {
     // Save session on page unload
     window.addEventListener('beforeunload', () => this.analytics.endSession());
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') this.analytics.endSession();
+      if (document.visibilityState === 'hidden') {
+        this.analytics.endSession();
+      } else if (document.visibilityState === 'visible') {
+        // Resume audio after returning from ad or background
+        this.audioManager.resume();
+      }
     });
 
     // Spawn first object and start loop

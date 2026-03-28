@@ -445,6 +445,9 @@ export class SettingsUI {
       localStorage.removeItem('rage-smash-save');
       localStorage.removeItem('rage-smash-analytics');
       localStorage.removeItem('rage-smash-tutorial-done');
+      localStorage.removeItem('rage-smash-login');
+      localStorage.removeItem('rage-smash-daily-challenges');
+      localStorage.removeItem('rage-smash-haptics');
       window.location.reload();
     });
 
