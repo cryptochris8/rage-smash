@@ -78,7 +78,7 @@ export class StoreKitManager {
 
   /** Purchase a product. Returns true on success. */
   async purchase(productId: string): Promise<boolean> {
-    if (!this.isNative) return false;
+    if (!this.isAvailable()) return false;
 
     try {
       const result = await StoreKit.purchase({ productId });

@@ -107,9 +107,10 @@ export class SettingsUI {
       this.onHapticsToggle(on);
     }));
 
-    // Remove Ads button (only show if ads not already removed)
+    // Remove Ads + Restore (only show on native where ads exist)
+    const isNative = !!(window as any).Capacitor?.isNativePlatform?.();
     panel.appendChild(this.createDivider());
-    if (!this.store.state.adsRemoved) {
+    if (!this.store.state.adsRemoved && isNative) {
       const removeAdsBtn = document.createElement('button');
       removeAdsBtn.textContent = 'Remove Ads — $2.99';
       Object.assign(removeAdsBtn.style, {
@@ -153,7 +154,8 @@ export class SettingsUI {
       panel.appendChild(removedLabel);
     }
 
-    // Restore Purchases button
+    // Restore Purchases button (native only)
+    if (!isNative) { /* skip on web */ } else {
     const restoreBtn = document.createElement('button');
     restoreBtn.textContent = 'Restore Purchases';
     Object.assign(restoreBtn.style, {
@@ -186,6 +188,7 @@ export class SettingsUI {
       }, 2000);
     });
     panel.appendChild(restoreBtn);
+    } // end isNative
 
     // Divider
     panel.appendChild(this.createDivider());
