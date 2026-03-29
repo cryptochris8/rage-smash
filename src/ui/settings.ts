@@ -9,6 +9,7 @@ export class SettingsUI {
   private onHapticsToggle: (enabled: boolean) => void;
   private onRemoveAds: () => Promise<boolean>;
   private onRestore: () => Promise<string[]>;
+  private onReset: () => void;
 
   constructor(
     container: HTMLElement,
@@ -17,6 +18,7 @@ export class SettingsUI {
     onHapticsToggle: (enabled: boolean) => void,
     onRemoveAds?: () => Promise<boolean>,
     onRestore?: () => Promise<string[]>,
+    onReset?: () => void,
   ) {
     this.container = container;
     this.store = store;
@@ -24,6 +26,7 @@ export class SettingsUI {
     this.onHapticsToggle = onHapticsToggle;
     this.onRemoveAds = onRemoveAds ?? (async () => false);
     this.onRestore = onRestore ?? (async () => []);
+    this.onReset = onReset ?? (() => {});
   }
 
   show(): void {
@@ -442,12 +445,15 @@ export class SettingsUI {
     });
     confirmBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
+      // Stop auto-save before clearing to prevent re-saving
+      this.onReset();
       localStorage.removeItem('rage-smash-save');
       localStorage.removeItem('rage-smash-analytics');
       localStorage.removeItem('rage-smash-tutorial-done');
       localStorage.removeItem('rage-smash-login');
       localStorage.removeItem('rage-smash-daily-challenges');
       localStorage.removeItem('rage-smash-haptics');
+      localStorage.removeItem('smash-loop-daily');
       window.location.reload();
     });
 

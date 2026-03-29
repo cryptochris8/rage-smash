@@ -302,6 +302,7 @@ export class Game {
     }, async () => {
       // Restore Purchases
       const entitlements = await this.storeKit.restorePurchases();
+
       const restored: string[] = [];
       if (entitlements.includes(PRODUCT_IDS.removeAds)) {
         this.store.update({ adsRemoved: true });
@@ -312,6 +313,9 @@ export class Game {
         restored.push('Starter Pack');
       }
       return restored;
+    }, () => {
+      // Reset — stop auto-save before localStorage is cleared
+      this.saveSystem.stopAutoSave();
     });
 
     // Initial goals panel update

@@ -111,4 +111,12 @@ export class SaveSystem {
       this.save();
     });
   }
+
+  /** Stop auto-saving (used before reset to prevent re-saving cleared data) */
+  stopAutoSave(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+  }
 }
