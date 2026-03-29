@@ -7,10 +7,12 @@ import { AdProvider, IAdSystem, RewardedPlacement } from './types';
 import { AD_PLACEMENTS, INTERSTITIAL_GATING } from './config';
 import { StubProvider } from './StubProvider';
 import { adAnalytics } from './analytics';
+import { AudioManager } from '../audio/AudioManager';
 
 export class AdManager implements IAdSystem {
   private store: Store;
   private provider: AdProvider;
+  private audioManager: AudioManager | null = null;
 
   // Active reward state
   private rewardActive = false;
@@ -39,6 +41,11 @@ export class AdManager implements IAdSystem {
     this.isFirstSession = store.state.sessionCount <= 1;
     // Default to stub; init() will try native
     this.provider = new StubProvider();
+  }
+
+  /** Set audio manager reference for resuming audio after ads */
+  setAudioManager(audioManager: AudioManager): void {
+    this.audioManager = audioManager;
   }
 
   async init(): Promise<void> {
@@ -95,6 +102,8 @@ export class AdManager implements IAdSystem {
 
     try {
       const success = await this.provider.showRewarded(placement);
+      // Resume audio after ad overlay closes (iOS doesn't fire visibilitychange)
+      this.audioManager?.resume();
       if (!success) {
         this.lastError = 'Ad unavailable, try again soon';
         return false;
@@ -148,6 +157,8 @@ export class AdManager implements IAdSystem {
   async showInterstitial(): Promise<boolean> {
     try {
       const success = await this.provider.showInterstitial('session_end');
+      // Resume audio after ad overlay closes (iOS doesn't fire visibilitychange)
+      this.audioManager?.resume();
       if (success) {
         this.lastInterstitialTime = Date.now();
         this.roundsSinceInterstitial = 0;
@@ -155,6 +166,7 @@ export class AdManager implements IAdSystem {
       }
       return success;
     } catch {
+      this.audioManager?.resume();
       return false;
     }
   }

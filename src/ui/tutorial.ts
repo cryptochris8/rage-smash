@@ -60,6 +60,7 @@ export class Tutorial {
       'Chain smashes for combo multipliers',
       'Visit the SHOP to unlock objects & upgrades',
       'Every 10 smashes triggers a PRESS BONUS',
+      'Rotate to landscape for a better view',
     ];
     for (const tip of tipItems) {
       const t = document.createElement('div');

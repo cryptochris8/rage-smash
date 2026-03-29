@@ -155,6 +155,7 @@ export class Game {
     // Haptics & Ads
     this.hapticsSystem = new HapticsSystem();
     this.adManager = new AdManager(this.store);
+    this.adManager.setAudioManager(this.audioManager);
     this.adManager.init().catch((err) => console.warn('[Game] Ad init error:', err));
 
     // Daily challenge
@@ -450,6 +451,11 @@ export class Game {
       container.removeEventListener('pointerdown', earlyUnlock);
     };
     container.addEventListener('pointerdown', earlyUnlock);
+
+    // Always try to resume audio on any tap (catches post-ad suspension on iOS)
+    container.addEventListener('pointerdown', () => {
+      this.audioManager.resume();
+    });
 
     // Save session on page unload
     window.addEventListener('beforeunload', () => this.analytics.endSession());

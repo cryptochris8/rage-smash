@@ -22,6 +22,7 @@ interface SaveData {
   totalPerfectHits: number;
   dailyStreak: number;
   jackpotBoostExpiresAt: number;
+  adsRemoved: boolean;
 }
 
 export class SaveSystem {
@@ -67,6 +68,7 @@ export class SaveSystem {
       if (typeof data.totalPerfectHits === 'number') updates.totalPerfectHits = data.totalPerfectHits;
       if (typeof data.dailyStreak === 'number') updates.dailyStreak = data.dailyStreak;
       if (typeof data.jackpotBoostExpiresAt === 'number') updates.jackpotBoostExpiresAt = data.jackpotBoostExpiresAt;
+      if (typeof data.adsRemoved === 'boolean') updates.adsRemoved = data.adsRemoved;
 
       if (Object.keys(updates).length > 0) {
         this.store.update(updates);
@@ -98,6 +100,7 @@ export class SaveSystem {
         totalPerfectHits: state.totalPerfectHits,
         dailyStreak: state.dailyStreak,
         jackpotBoostExpiresAt: state.jackpotBoostExpiresAt,
+        adsRemoved: state.adsRemoved,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch {
