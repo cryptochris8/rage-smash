@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../../game/config';
 import { SmashableObjectDef } from '../../game/state';
+import { ModelManager } from '../ModelManager';
+import { MODEL_REGISTRY } from '../../content/model-registry';
 
 // ---------------------------------------------------------------------------
 // Color helpers
@@ -355,14 +357,20 @@ function buildObject(def: SmashableObjectDef): THREE.Group {
 
 export class SmashableManager {
   private scene: THREE.Scene;
+  private modelManager: ModelManager | null = null;
   private currentGroup: THREE.Group | null = null;
   private animProgress: number = 1;
   private targetScale: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
   private elapsedTime: number = 0;
   private baseY: number = CONFIG.objectSpawnY;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, modelManager?: ModelManager) {
     this.scene = scene;
+    this.modelManager = modelManager ?? null;
+  }
+
+  setModelManager(mgr: ModelManager): void {
+    this.modelManager = mgr;
   }
 
   spawn(def: SmashableObjectDef): void {
@@ -371,20 +379,92 @@ export class SmashableManager {
       this.currentGroup = null;
     }
 
-    const group = buildObject(def);
+    // Check registry for a GLB model
+    const entry = MODEL_REGISTRY[def.id];
+    if (entry && this.modelManager) {
+      // Try synchronous clone first (model already cached from preload)
+      const clone = this.modelManager.get(entry.path);
+      if (clone) {
+        this.placeGroup(clone, def, entry);
+        return;
+      }
+      // Async fallback — show procedural immediately, swap when loaded
+      const fallback = buildObject(def);
+      this.placeGroup(fallback, def, entry);
+      this.modelManager.loadAndClone(entry.path).then((loaded) => {
+        if (loaded && this.currentGroup === fallback) {
+          this.scene.remove(fallback);
+          // Carry over position and rotation but NOT scale — placeGroupDirect
+          // will apply the correct registry scale
+          loaded.position.copy(fallback.position);
+          loaded.rotation.copy(fallback.rotation);
+          this.placeGroupDirect(loaded, def, entry);
+        }
+      });
+      return;
+    }
 
+    // No registry entry — use procedural geometry
+    const group = buildObject(def);
+    this.placeGroup(group, def);
+  }
+
+  /** Place a group into the scene with spawn animation setup. */
+  private placeGroup(
+    group: THREE.Group,
+    def: SmashableObjectDef,
+    entry?: { scale?: number | [number, number, number]; offsetY?: number },
+  ): void {
     group.userData.primaryColor = def.color;
 
     group.scale.set(0, 0, 0);
-    this.targetScale.set(def.scale[0], def.scale[1], def.scale[2]);
 
-    this.baseY = CONFIG.objectSpawnY;
+    if (entry?.scale != null) {
+      const s = entry.scale;
+      if (typeof s === 'number') {
+        this.targetScale.set(s, s, s);
+      } else {
+        this.targetScale.set(s[0], s[1], s[2]);
+      }
+    } else {
+      this.targetScale.set(def.scale[0], def.scale[1], def.scale[2]);
+    }
+
+    this.baseY = CONFIG.objectSpawnY + (entry?.offsetY ?? 0);
     group.position.set(0, this.baseY, 0);
 
     this.scene.add(group);
     this.currentGroup = group;
     this.animProgress = 0;
     this.elapsedTime = 0;
+  }
+
+  /** Place a group directly (for async swap — applies scale immediately). */
+  private placeGroupDirect(
+    group: THREE.Group,
+    def: SmashableObjectDef,
+    entry?: { scale?: number | [number, number, number]; offsetY?: number },
+  ): void {
+    group.userData.primaryColor = def.color;
+
+    if (entry?.scale != null) {
+      const s = entry.scale;
+      if (typeof s === 'number') {
+        this.targetScale.set(s, s, s);
+      } else {
+        this.targetScale.set(s[0], s[1], s[2]);
+      }
+    } else {
+      this.targetScale.set(def.scale[0], def.scale[1], def.scale[2]);
+    }
+
+    // Apply scale immediately — animation already completed on the fallback
+    group.scale.set(this.targetScale.x, this.targetScale.y, this.targetScale.z);
+
+    this.baseY = CONFIG.objectSpawnY + (entry?.offsetY ?? 0);
+
+    this.scene.add(group);
+    this.currentGroup = group;
   }
 
   getCurrent(): THREE.Group | null {

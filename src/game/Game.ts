@@ -8,6 +8,8 @@ import { setupLighting, SceneLights } from '../render/lighting';
 import { createPedestal } from '../render/objects/pedestal';
 import { SmashableManager } from '../render/objects/smashable';
 import { FragmentManager } from '../render/objects/fragments';
+import { ModelManager } from '../render/ModelManager';
+import { getPreloadPaths } from '../content/model-registry';
 import { InputSystem } from '../systems/input';
 import { SmashSystem } from '../systems/smash';
 import { ParticleSystem } from '../systems/particles';
@@ -53,6 +55,7 @@ export class Game {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private lights: SceneLights;
+  private modelManager: ModelManager;
   private smashableManager: SmashableManager;
   private fragmentManager: FragmentManager;
   private particleSystem: ParticleSystem;
@@ -143,8 +146,14 @@ export class Game {
     this.lights = setupLighting(this.scene);
     createPedestal(this.scene);
 
+    // 3D model manager — preload registered GLB assets
+    this.modelManager = new ModelManager();
+    this.modelManager.preload(getPreloadPaths()).catch((err) =>
+      console.warn('[Game] Model preload error:', err),
+    );
+
     // 3D object managers
-    this.smashableManager = new SmashableManager(this.scene);
+    this.smashableManager = new SmashableManager(this.scene, this.modelManager);
     this.fragmentManager = new FragmentManager(this.scene);
     this.particleSystem = new ParticleSystem(this.scene);
 

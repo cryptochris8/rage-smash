@@ -1,6 +1,9 @@
 export type Rarity = 'common' | 'uncommon' | 'rare';
 export type GeometryType = 'box' | 'cylinder' | 'sphere' | 'cone' | 'torus';
 export type ParticleTheme = 'default' | 'glass' | 'metal' | 'organic' | 'electronic';
+export type ObjectCategory = 'glass' | 'ceramic' | 'tech' | 'luxury' | 'food' | 'soft';
+export type BreakType = 'shatter' | 'crackBurst' | 'juicySplit' | 'chunkBreak' | 'softBurst' | 'premiumBurst';
+export type WeightClass = 'light' | 'medium' | 'heavy' | 'premiumHeavy';
 
 export interface SmashableObjectDef {
   id: string;
@@ -11,6 +14,11 @@ export interface SmashableObjectDef {
   geometry: GeometryType;
   scale: [number, number, number];
   particleTheme?: ParticleTheme;
+  category?: ObjectCategory;
+  breakType?: BreakType;
+  weightClass?: WeightClass;
+  /** Relative spawn weight — higher = more frequent. Defaults to 1. */
+  spawnWeight?: number;
 }
 
 export interface HammerSkin {

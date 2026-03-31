@@ -1,6 +1,23 @@
-import { Store } from '../game/state';
+import { Store, SmashableObjectDef } from '../game/state';
 import { SmashableManager } from '../render/objects/smashable';
 import { OBJECTS } from '../content/objects';
+
+/** Pick a random object using spawnWeight for weighted distribution. */
+function weightedPick(candidates: SmashableObjectDef[]): SmashableObjectDef {
+  let totalWeight = 0;
+  for (const obj of candidates) {
+    totalWeight += obj.spawnWeight ?? 1;
+  }
+
+  let roll = Math.random() * totalWeight;
+  for (const obj of candidates) {
+    roll -= obj.spawnWeight ?? 1;
+    if (roll <= 0) return obj;
+  }
+
+  // Fallback (shouldn't happen)
+  return candidates[candidates.length - 1];
+}
 
 export class SpawnSystem {
   private store: Store;
@@ -26,9 +43,8 @@ export class SpawnSystem {
       candidates = available.filter((obj) => obj.id !== this.lastSpawnedId);
     }
 
-    // Pick a random object
-    const index = Math.floor(Math.random() * candidates.length);
-    const def = candidates[index];
+    // Weighted random pick based on spawnWeight
+    const def = weightedPick(candidates);
 
     this.lastSpawnedId = def.id;
     this.smashableManager.spawn(def);
