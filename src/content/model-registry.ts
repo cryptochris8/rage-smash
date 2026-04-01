@@ -84,6 +84,62 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     triBudget: 'hero',
   },
 
+  keyboard: {
+    path: '/models/smash_keyboard_01.glb',
+    scale: 1.2,
+    offsetY: 0.1,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  monitor: {
+    path: '/models/smash_monitor_01.glb',
+    scale: 1.2,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
+  laptop: {
+    path: '/models/smash_laptop_01.glb',
+    scale: 1.2,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'hero',
+  },
+
+  brain: {
+    path: '/models/smash_brain_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
+  blob: {
+    path: '/models/smash_blob_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: true,
+    triBudget: 'hero',
+  },
+
+  'weird-face': {
+    path: '/models/smash_weird_face_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: true,
+    triBudget: 'hero',
+  },
+
+  skull: {
+    path: '/models/smash_skull_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
   // ── Future entries ────────────────────────────────────────────────
 };
 

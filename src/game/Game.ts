@@ -102,6 +102,7 @@ export class Game {
   private container: HTMLElement;
   private lastSmashPower: number = 1;
   private lastSmashRarity: string = 'common';
+  private lastSmashPack: string = 'everyday';
   private lastBestCombo: number = 1;
   private streakIdleTimer: number = 0;
   private readonly streakTimeoutSec: number = 4;
@@ -358,7 +359,7 @@ export class Game {
         this.triggerZoomPunch();
 
         // Voice line (handles cooldowns/probability internally)
-        this.voiceManager.onSmash(this.lastSmashPower, streak, this.lastSmashRarity);
+        this.voiceManager.onSmash(this.lastSmashPower, streak, this.lastSmashRarity, this.lastSmashPack);
 
         // Smart boost suggestion
         if (this.smartBoostSystem.checkTrigger(earned)) {
@@ -510,6 +511,7 @@ export class Game {
       ? OBJECTS.find((o) => o.id === this.store.state.currentObjectId)
       : null;
     this.lastSmashRarity = objDef?.rarity ?? 'common';
+    this.lastSmashPack = objDef?.pack ?? 'everyday';
 
     // Check if this smash should be a press bonus
     if (this.nextIsPress && CONFIG.pressEnabled) {
@@ -616,6 +618,7 @@ export class Game {
       ? OBJECTS.find((o) => o.id === this.store.state.currentObjectId)
       : null;
     this.lastSmashRarity = objDef?.rarity ?? 'common';
+    this.lastSmashPack = objDef?.pack ?? 'everyday';
 
     // Check if this smash should be a press bonus
     if (this.nextIsPress && CONFIG.pressEnabled) {

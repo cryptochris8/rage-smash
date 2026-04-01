@@ -1,6 +1,6 @@
 import { Store } from '../game/state';
 
-type VoiceCategory = 'brainrot' | 'combo' | 'perfect' | 'fail' | 'reward';
+type VoiceCategory = 'brainrot' | 'combo' | 'perfect' | 'fail' | 'reward' | 'meme';
 
 interface VoiceClip {
   category: VoiceCategory;
@@ -33,6 +33,26 @@ const VOICE_CLIPS: { category: VoiceCategory; path: string }[] = [
   { category: 'reward', path: '/audio/voice/reward/voice_reward_01.mp3' },
   { category: 'reward', path: '/audio/voice/reward/voice_reward_02.mp3' },
   { category: 'reward', path: '/audio/voice/reward/voice_reward_03.mp3' },
+
+  // Meme pack reactions
+  { category: 'meme', path: '/audio/voice/meme/aint-no-way.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/bro-what-is-that.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/this-is-cursed.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/brainrot-activated.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/thats-ridiculous.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/why-is-that-here.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/you-absolutely-cooked-that.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/that-was-insane.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/you-broke-the-setup.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/no-way-you-smashed-that.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/jackpot.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/you-got-lucky.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/thats-huge.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/what-am-i-looking-at.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/okayyy.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/clean.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/nice.mp3' },
+  { category: 'meme', path: '/audio/voice/meme/thats-wild.mp3' },
 ];
 
 /** Cooldowns in ms */
@@ -43,6 +63,7 @@ const COOLDOWNS = {
   perfect: 2000,
   fail: 0,
   reward: 3000,
+  meme: 4000,
 };
 
 /** Trigger chance for brainrot (random) lines */
@@ -74,6 +95,7 @@ export class VoiceManager {
     perfect: 0,
     fail: 0,
     reward: 0,
+    meme: 0,
   };
 
   /** Track last played index per category to avoid repeats */
@@ -83,6 +105,7 @@ export class VoiceManager {
     perfect: -1,
     fail: -1,
     reward: -1,
+    meme: -1,
   };
 
   /** External gain node for SFX ducking (set by Game.ts) */
@@ -203,8 +226,17 @@ export class VoiceManager {
   // --- Public API ---
 
   /** Call on every smash — handles all voice logic internally */
-  onSmash(power: number, comboLevel: number, rarity: string): void {
+  onSmash(power: number, comboLevel: number, rarity: string, pack?: string): void {
     if (this.store.state.muted || !this.loaded) return;
+
+    // Meme pack objects get meme voice lines with high trigger chance
+    if (pack === 'meme' && this.canPlay('meme')) {
+      const memeChance = rarity === 'rare' ? 0.7 : 0.4;
+      if (Math.random() < memeChance) {
+        this.playRandom('meme');
+        return;
+      }
+    }
 
     // Priority order: fail handled separately, then perfect > reward > combo > brainrot
 

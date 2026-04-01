@@ -19,4 +19,10 @@ export const PACKS: Pack[] = [
     cost: 750,
     description: 'Strange objects from the internet',
   },
+  {
+    id: 'meme',
+    name: 'Meme Pack',
+    cost: 1500,
+    description: 'Chaotic, funny, and absurd objects from the internet',
+  },
 ];
