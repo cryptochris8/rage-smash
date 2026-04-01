@@ -258,6 +258,22 @@ export class Game {
       this.audioManager.playJackpotSound();
     }, (needed, upgradeName) => {
       this.adPrompts.showUpgradeRescue(needed, upgradeName);
+    }, this.storeKit, async () => {
+      // Remove Ads IAP (from shop)
+      const success = await this.storeKit.purchase(PRODUCT_IDS.removeAds);
+      if (success) {
+        this.store.update({ adsRemoved: true });
+        this.audioManager.playDailyReward();
+      }
+      return success;
+    }, async () => {
+      // Starter Pack IAP (from shop)
+      const success = await this.storeKit.purchase(PRODUCT_IDS.starterPack);
+      if (success) {
+        this.starterPackSystem.purchase();
+        this.audioManager.playDailyReward();
+      }
+      return success;
     });
     this.dailyUI = new DailyUI(
       container,

@@ -17,6 +17,7 @@ import {
 } from '../game/progression';
 import { getUpgradeCost } from '../game/economy';
 import { CONFIG } from '../game/config';
+import { StoreKitManager, PRODUCT_IDS } from '../iap/StoreKitManager';
 
 export class Shop {
   private container: HTMLElement;
@@ -35,14 +36,21 @@ export class Shop {
   private onUpgradePurchase: (() => void) | null = null;
   private onUnlock: ((itemName: string) => void) | null = null;
   private onUpgradeRescue: ((needed: number, upgradeName: string) => void) | null = null;
+  private storeKit: StoreKitManager | null = null;
+  private onRemoveAds: (() => Promise<boolean>) | null = null;
+  private onBuyStarterPack: (() => Promise<boolean>) | null = null;
+  private offersSection: HTMLDivElement;
 
-  constructor(container: HTMLElement, store: Store, onRoomSelect?: (roomId: string) => void, onUpgradePurchase?: () => void, onUnlock?: (itemName: string) => void, onUpgradeRescue?: (needed: number, upgradeName: string) => void) {
+  constructor(container: HTMLElement, store: Store, onRoomSelect?: (roomId: string) => void, onUpgradePurchase?: () => void, onUnlock?: (itemName: string) => void, onUpgradeRescue?: (needed: number, upgradeName: string) => void, storeKit?: StoreKitManager, onRemoveAds?: () => Promise<boolean>, onBuyStarterPack?: () => Promise<boolean>) {
     this.container = container;
     this.store = store;
     this.onRoomSelect = onRoomSelect ?? null;
     this.onUpgradePurchase = onUpgradePurchase ?? null;
     this.onUnlock = onUnlock ?? null;
     this.onUpgradeRescue = onUpgradeRescue ?? null;
+    this.storeKit = storeKit ?? null;
+    this.onRemoveAds = onRemoveAds ?? null;
+    this.onBuyStarterPack = onBuyStarterPack ?? null;
 
     // --- Root overlay ---
     this.root = document.createElement('div');
@@ -128,6 +136,18 @@ export class Shop {
 
     // --- Content ---
     this.content = document.createElement('div');
+
+    // Section: Special Offers (IAP)
+    const offersHeading = this.createSectionHeading('Special Offers');
+    this.content.appendChild(offersHeading);
+    this.offersSection = document.createElement('div');
+    Object.assign(this.offersSection.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
+      marginBottom: '28px',
+    });
+    this.content.appendChild(this.offersSection);
 
     // Section: Upgrades
     const upgradesHeading = this.createSectionHeading('Upgrades');
@@ -255,11 +275,164 @@ export class Shop {
   // ---- Private helpers ----
 
   private rebuild(): void {
+    this.rebuildOffers();
     this.rebuildUpgrades();
     this.rebuildPacks();
     this.rebuildRooms();
     this.rebuildSkins();
     this.footerCoins.textContent = this.store.state.coins.toLocaleString();
+  }
+
+  private rebuildOffers(): void {
+    this.offersSection.innerHTML = '';
+
+    // Starter Pack
+    if (!this.store.state.starterPackPurchased) {
+      const card = this.createCard();
+      Object.assign(card.style, {
+        border: '1px solid rgba(255,215,0,0.3)',
+        background: 'linear-gradient(135deg, rgba(255,215,0,0.08), rgba(255,255,255,0.06))',
+      });
+
+      const icon = document.createElement('div');
+      icon.textContent = '\u2B50';
+      icon.style.fontSize = '24px';
+      icon.style.flexShrink = '0';
+      card.appendChild(icon);
+
+      const info = document.createElement('div');
+      info.style.flex = '1';
+
+      const name = document.createElement('div');
+      name.textContent = 'Starter Pack';
+      Object.assign(name.style, {
+        fontSize: '15px',
+        fontWeight: '700',
+        color: '#ffd700',
+        marginBottom: '2px',
+      });
+
+      const desc = document.createElement('div');
+      desc.textContent = 'Rage Fury Hammer + 5,000 Coins + 24h 2X Boost';
+      Object.assign(desc.style, {
+        fontSize: '12px',
+        color: 'rgba(255,255,255,0.55)',
+        lineHeight: '1.3',
+      });
+
+      info.appendChild(name);
+      info.appendChild(desc);
+      card.appendChild(info);
+
+      const price = this.storeKit?.getDisplayPrice(PRODUCT_IDS.starterPack) ?? '$1.99';
+      const btn = this.createBuyButton(price);
+      Object.assign(btn.style, {
+        background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+      });
+      btn.addEventListener('pointerdown', async (e) => {
+        e.stopPropagation();
+        if (this.onBuyStarterPack) {
+          btn.textContent = '...';
+          btn.style.pointerEvents = 'none';
+          const success = await this.onBuyStarterPack();
+          if (!success) {
+            btn.textContent = price;
+            btn.style.pointerEvents = 'auto';
+          }
+        }
+      });
+      card.appendChild(btn);
+      this.offersSection.appendChild(card);
+    } else {
+      const card = this.createCard();
+      const icon = document.createElement('div');
+      icon.textContent = '\u2B50';
+      icon.style.fontSize = '24px';
+      icon.style.flexShrink = '0';
+      card.appendChild(icon);
+
+      const name = document.createElement('div');
+      name.textContent = 'Starter Pack';
+      Object.assign(name.style, {
+        flex: '1',
+        fontSize: '15px',
+        fontWeight: '700',
+        color: '#ffffff',
+      });
+      card.appendChild(name);
+      card.appendChild(this.createBadge('OWNED', '#6b7280'));
+      this.offersSection.appendChild(card);
+    }
+
+    // Remove Ads
+    if (!this.store.state.adsRemoved) {
+      const card = this.createCard();
+
+      const icon = document.createElement('div');
+      icon.textContent = '\uD83D\uDEAB';
+      icon.style.fontSize = '24px';
+      icon.style.flexShrink = '0';
+      card.appendChild(icon);
+
+      const info = document.createElement('div');
+      info.style.flex = '1';
+
+      const name = document.createElement('div');
+      name.textContent = 'Remove Ads';
+      Object.assign(name.style, {
+        fontSize: '15px',
+        fontWeight: '700',
+        color: '#ffffff',
+        marginBottom: '2px',
+      });
+
+      const desc = document.createElement('div');
+      desc.textContent = 'Permanently remove all ads';
+      Object.assign(desc.style, {
+        fontSize: '12px',
+        color: 'rgba(255,255,255,0.55)',
+      });
+
+      info.appendChild(name);
+      info.appendChild(desc);
+      card.appendChild(info);
+
+      const price = this.storeKit?.getDisplayPrice(PRODUCT_IDS.removeAds) ?? '$2.99';
+      const btn = this.createBuyButton(price);
+      btn.addEventListener('pointerdown', async (e) => {
+        e.stopPropagation();
+        if (this.onRemoveAds) {
+          btn.textContent = '...';
+          btn.style.pointerEvents = 'none';
+          const success = await this.onRemoveAds();
+          if (!success) {
+            btn.textContent = price;
+            btn.style.pointerEvents = 'auto';
+          }
+        }
+      });
+      card.appendChild(btn);
+      this.offersSection.appendChild(card);
+    } else {
+      const card = this.createCard();
+      const icon = document.createElement('div');
+      icon.textContent = '\uD83D\uDEAB';
+      icon.style.fontSize = '24px';
+      icon.style.flexShrink = '0';
+      card.appendChild(icon);
+
+      const name = document.createElement('div');
+      name.textContent = 'Remove Ads';
+      Object.assign(name.style, {
+        flex: '1',
+        fontSize: '15px',
+        fontWeight: '700',
+        color: '#ffffff',
+      });
+      card.appendChild(name);
+      card.appendChild(this.createBadge('ACTIVE', '#22c55e'));
+      this.offersSection.appendChild(card);
+    }
   }
 
   private rebuildUpgrades(): void {
