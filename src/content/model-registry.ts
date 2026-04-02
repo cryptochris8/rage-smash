@@ -212,6 +212,30 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     triBudget: 'hero',
   },
 
+  helmet: {
+    path: '/models/smash_helmet_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  soccer: {
+    path: '/models/smash_soccer_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  football: {
+    path: '/models/smash_football_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
   // ── Future entries ────────────────────────────────────────────────
 };
 
