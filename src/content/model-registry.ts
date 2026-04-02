@@ -140,6 +140,78 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     triBudget: 'mid',
   },
 
+  'teddy-bear': {
+    path: '/models/smash_teddy_bear_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  duck: {
+    path: '/models/smash_rubber_duck_01.glb',
+    scale: 0.9,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  pillow: {
+    path: '/models/smash_pillow_01.glb',
+    scale: 1.0,
+    offsetY: 0.1,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  apple: {
+    path: '/models/smash_apple_01.glb',
+    scale: 0.8,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  pizza: {
+    path: '/models/smash_pizza_01.glb',
+    scale: 1.0,
+    offsetY: 0.1,
+    hero: false,
+    triBudget: 'low',
+  },
+
+  cake: {
+    path: '/models/smash_cake_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
+  'cash-pile': {
+    path: '/models/smash_cash_pile_01.glb',
+    scale: 1.0,
+    offsetY: 0,
+    hero: true,
+    triBudget: 'hero',
+  },
+
+  safe: {
+    path: '/models/smash_safe_01.glb',
+    scale: 1.2,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
+  diamond: {
+    path: '/models/smash_diamond_01.glb',
+    scale: 1.2,
+    offsetY: 0,
+    hero: true,
+    triBudget: 'hero',
+  },
+
   // ── Future entries ────────────────────────────────────────────────
 };
 

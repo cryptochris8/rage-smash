@@ -25,4 +25,22 @@ export const PACKS: Pack[] = [
     cost: 1500,
     description: 'Chaotic, funny, and absurd objects from the internet',
   },
+  {
+    id: 'soft',
+    name: 'Soft Pack',
+    cost: 400,
+    description: 'Pillows, plushies, and squishy things to destroy',
+  },
+  {
+    id: 'food',
+    name: 'Food Pack',
+    cost: 500,
+    description: 'Smash cakes, fruit, and other tasty treats',
+  },
+  {
+    id: 'luxury',
+    name: 'Luxury Pack',
+    cost: 3000,
+    description: 'Rare premium objects with gold sparkles and big rewards',
+  },
 ];

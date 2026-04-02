@@ -12,6 +12,7 @@ import { IAdSystem } from '../ads/types';
 import { JackpotSystem } from './jackpot';
 import { StarterPackSystem } from './starter-pack';
 import { EventSystem } from './events';
+import { ModelManager } from '../render/ModelManager';
 
 type SmashPhase = 'idle' | 'swinging' | 'returning';
 
@@ -31,6 +32,9 @@ export class SmashSystem {
   private phase: SmashPhase = 'idle';
   private timer = 0;
   private pendingChargeMultiplier = 1;
+  private modelManager: ModelManager;
+  private hammerModelLoaded = false;
+  private currentHammerSkinId: string = '';
 
   constructor(
     scene: THREE.Scene,
@@ -43,6 +47,7 @@ export class SmashSystem {
     jackpotSystem: JackpotSystem,
     starterPackSystem: StarterPackSystem,
     eventSystem: EventSystem,
+    modelManager: ModelManager,
   ) {
     this.scene = scene;
     this.store = store;
@@ -54,11 +59,12 @@ export class SmashSystem {
     this.jackpotSystem = jackpotSystem;
     this.starterPackSystem = starterPackSystem;
     this.eventSystem = eventSystem;
+    this.modelManager = modelManager;
 
     this.hammer = this.createHammer();
     this.scene.add(this.hammer);
 
-    // Apply initial skin color + react to skin changes
+    // Load initial hammer model and react to skin changes
     this.applyHammerSkin();
     this.store.subscribe(() => this.applyHammerSkin());
   }
@@ -66,10 +72,108 @@ export class SmashSystem {
   private applyHammerSkin(): void {
     const skin = HAMMER_SKINS.find((s) => s.id === this.store.state.selectedHammer);
     if (!skin) return;
+
+    // If skin changed, swap model or revert to procedural
+    if (skin.id !== this.currentHammerSkinId) {
+      this.currentHammerSkinId = skin.id;
+      if (skin.model) {
+        this.loadHammerModel(skin.model);
+      } else {
+        this.swapToProcedural(skin.color);
+      }
+      return;
+    }
+
+    // Same skin — only tint procedural (color-only) hammers.
+    // 3D model skins keep their original textures untouched.
+    if (!skin.model && !this.hammerModelLoaded) {
+      const head = this.hammer.children[1] as THREE.Mesh;
+      if (head) {
+        (head.material as THREE.MeshStandardMaterial).color.setHex(skin.color);
+      }
+    }
+  }
+
+  private tintHammerModel(color: number): void {
+    this.hammer.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const mat of materials) {
+          const stdMat = mat as THREE.MeshStandardMaterial;
+          if (stdMat.color) {
+            stdMat.color.setHex(color);
+          }
+        }
+      }
+    });
+  }
+
+  private swapToProcedural(color: number): void {
+    const pos = this.hammer.position.clone();
+    const rot = this.hammer.rotation.clone();
+    this.scene.remove(this.hammer);
+
+    this.hammer = this.createHammer();
+    this.hammer.position.copy(pos);
+    this.hammer.rotation.copy(rot);
+    this.hammerModelLoaded = false;
+    this.scene.add(this.hammer);
+
     const head = this.hammer.children[1] as THREE.Mesh;
     if (head) {
-      (head.material as THREE.MeshStandardMaterial).color.setHex(skin.color);
+      (head.material as THREE.MeshStandardMaterial).color.setHex(color);
     }
+  }
+
+  private async loadHammerModel(modelPath: string): Promise<void> {
+    const model = await this.modelManager.loadAndClone(modelPath);
+    if (!model) return;
+
+    // Deep-clone materials so tinting one hammer can't affect the cache
+    model.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        if (Array.isArray(mesh.material)) {
+          mesh.material = mesh.material.map((m) => m.clone());
+        } else if (mesh.material) {
+          mesh.material = mesh.material.clone();
+        }
+      }
+    });
+
+    // If skin changed again while loading, abort
+    const skin = HAMMER_SKINS.find((s) => s.id === this.store.state.selectedHammer);
+    if (!skin || skin.model !== modelPath) return;
+
+    const pos = this.hammer.position.clone();
+    const rot = this.hammer.rotation.clone();
+    this.scene.remove(this.hammer);
+
+    // GLB models are normalized to 1 unit sitting on y=0.
+    // modelFlip: true = head is at top natively, flip 180° so head hangs below pivot.
+    // modelFlip: false/omitted = head is already at bottom, no flip needed.
+    const outerGroup = new THREE.Group();
+    const hammerScale = CONFIG.hammerLength * 1.2;
+    model.scale.setScalar(hammerScale);
+
+    if (skin.modelFlip) {
+      // Head at top natively — flip so head hangs below pivot.
+      // After flip, handle naturally lands at origin (pivot).
+      model.rotation.x = Math.PI;
+    } else {
+      // Head at bottom natively — offset down so handle top is at pivot.
+      model.position.y = -hammerScale;
+    }
+    model.rotation.y = skin.modelRotationY ?? -Math.PI / 2;
+
+    outerGroup.add(model);
+    outerGroup.position.copy(pos);
+    outerGroup.rotation.copy(rot);
+
+    this.hammer = outerGroup;
+    this.hammerModelLoaded = true;
+    this.scene.add(this.hammer);
   }
 
   private createHammer(): THREE.Group {

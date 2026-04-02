@@ -27,6 +27,12 @@ export interface HammerSkin {
   color: number;
   cost: number;
   exclusive?: boolean;
+  /** Path to GLB model. If omitted, uses procedural geometry with color tint. */
+  model?: string;
+  /** If true, flip model 180° on X (for models where head is at top natively). */
+  modelFlip?: boolean;
+  /** Y rotation override in radians to aim the striking face. Defaults to -PI/2. */
+  modelRotationY?: number;
 }
 
 export interface RoomDef {

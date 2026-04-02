@@ -10,6 +10,7 @@ import { SmashableManager } from '../render/objects/smashable';
 import { FragmentManager } from '../render/objects/fragments';
 import { ModelManager } from '../render/ModelManager';
 import { getPreloadPaths } from '../content/model-registry';
+import { getHammerModelPaths } from '../content/skins';
 import { InputSystem } from '../systems/input';
 import { SmashSystem } from '../systems/smash';
 import { ParticleSystem } from '../systems/particles';
@@ -149,7 +150,7 @@ export class Game {
 
     // 3D model manager — preload registered GLB assets
     this.modelManager = new ModelManager();
-    this.modelManager.preload(getPreloadPaths()).catch((err) =>
+    this.modelManager.preload([...getPreloadPaths(), ...getHammerModelPaths()]).catch((err) =>
       console.warn('[Game] Model preload error:', err),
     );
 
@@ -202,6 +203,7 @@ export class Game {
       this.jackpotSystem,
       this.starterPackSystem,
       this.eventSystem,
+      this.modelManager,
     );
     this.pressSystem = new PressSystem(
       this.scene,

@@ -641,30 +641,58 @@ export class Shop {
       const affordable = canUnlockHammer(this.store, skin.id);
       const card = this.createCard();
 
-      // Color swatch
+      // Color swatch or 3D icon
       const swatch = document.createElement('div');
-      const hexColor = '#' + skin.color.toString(16).padStart(6, '0');
-      Object.assign(swatch.style, {
-        width: '32px',
-        height: '32px',
-        borderRadius: '8px',
-        background: hexColor,
-        border: '2px solid rgba(255,255,255,0.2)',
-        flexShrink: '0',
-      });
+      if (skin.model) {
+        swatch.textContent = '\uD83D\uDD28';
+        Object.assign(swatch.style, {
+          width: '32px',
+          height: '32px',
+          fontSize: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: '0',
+        });
+      } else {
+        const hexColor = '#' + skin.color.toString(16).padStart(6, '0');
+        Object.assign(swatch.style, {
+          width: '32px',
+          height: '32px',
+          borderRadius: '8px',
+          background: hexColor,
+          border: '2px solid rgba(255,255,255,0.2)',
+          flexShrink: '0',
+        });
+      }
       card.appendChild(swatch);
 
-      // Name
+      // Name + 3D badge
+      const nameRow = document.createElement('div');
+      nameRow.style.flex = '1';
+      nameRow.style.paddingLeft = '10px';
+
       const name = document.createElement('div');
       name.textContent = skin.name;
       Object.assign(name.style, {
-        flex: '1',
         fontSize: '15px',
         fontWeight: '700',
         color: '#ffffff',
-        paddingLeft: '10px',
       });
-      card.appendChild(name);
+      nameRow.appendChild(name);
+
+      if (skin.model) {
+        const tag = document.createElement('div');
+        tag.textContent = '3D Model';
+        Object.assign(tag.style, {
+          fontSize: '11px',
+          color: 'rgba(255,215,0,0.7)',
+          fontWeight: '600',
+        });
+        nameRow.appendChild(tag);
+      }
+
+      card.appendChild(nameRow);
 
       // Action
       if (selected) {
