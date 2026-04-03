@@ -236,6 +236,14 @@ export const MODEL_REGISTRY: Record<string, ModelEntry> = {
     triBudget: 'low',
   },
 
+  'banana-monster': {
+    path: '/models/smash_banana_monster_01.glb',
+    scale: 1.2,
+    offsetY: 0,
+    hero: false,
+    triBudget: 'mid',
+  },
+
   // ── Future entries ────────────────────────────────────────────────
 };
 

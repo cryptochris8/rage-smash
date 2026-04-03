@@ -339,6 +339,20 @@ export const OBJECTS: SmashableObjectDef[] = [
 
   // Chaos objects
   {
+    id: 'banana-monster',
+    name: 'Banana Monster',
+    pack: 'meme',
+    rarity: 'rare',
+    color: 0xffe135,
+    geometry: 'sphere',
+    scale: [0.8, 0.9, 0.8],
+    particleTheme: 'organic',
+    category: 'food',
+    breakType: 'juicySplit',
+    weightClass: 'medium',
+    spawnWeight: 1,
+  },
+  {
     id: 'banana',
     name: 'Banana',
     pack: 'meme',

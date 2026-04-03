@@ -21,6 +21,9 @@ export class HUD {
   private coinAnimTo: number;
   private coinAnimStart: number = 0;
   private coinAnimId: number = 0;
+  private bottomRight!: HTMLDivElement;
+  private portraitQuery: MediaQueryList | null = null;
+  private portraitHandler: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -96,14 +99,24 @@ export class HUD {
     });
     this.root.appendChild(this.comboDisplay);
 
-    // --- Bottom-left: Mute button ---
-    this.muteBtn = document.createElement('button');
-    this.muteBtn.textContent = '\uD83D\uDD0A';
-    Object.assign(this.muteBtn.style, {
+    // --- Bottom-left flex container ---
+    const bottomLeft = document.createElement('div');
+    Object.assign(bottomLeft.style, {
       position: 'absolute',
       bottom: '0',
       left: '0',
-      margin: `0 0 calc(14px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px))`,
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '8px',
+      alignItems: 'flex-end',
+      padding: `0 0 calc(14px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px))`,
+      pointerEvents: 'none',
+    });
+
+    // --- Mute button ---
+    this.muteBtn = document.createElement('button');
+    this.muteBtn.textContent = '\uD83D\uDD0A';
+    Object.assign(this.muteBtn.style, {
       minWidth: '48px',
       minHeight: '48px',
       display: 'flex',
@@ -125,17 +138,13 @@ export class HUD {
       e.stopPropagation();
       onMuteToggle();
     });
-    this.root.appendChild(this.muteBtn);
+    bottomLeft.appendChild(this.muteBtn);
 
-    // --- Bottom-left: Settings gear (next to mute) ---
+    // --- Settings gear ---
     if (onSettingsToggle) {
       const settingsBtn = document.createElement('button');
       settingsBtn.textContent = '\u2699\uFE0F';
       Object.assign(settingsBtn.style, {
-        position: 'absolute',
-        bottom: '0',
-        left: '0',
-        margin: `0 0 calc(14px + env(safe-area-inset-bottom, 0px)) calc(70px + env(safe-area-inset-left, 0px))`,
         minWidth: '48px',
         minHeight: '48px',
         display: 'flex',
@@ -156,19 +165,32 @@ export class HUD {
         e.stopPropagation();
         onSettingsToggle();
       });
-      this.root.appendChild(settingsBtn);
+      bottomLeft.appendChild(settingsBtn);
     }
 
-    // --- Bottom-right: Gift button (login rewards) ---
+    this.root.appendChild(bottomLeft);
+
+    // --- Bottom-right flex container ---
+    this.bottomRight = document.createElement('div');
+    Object.assign(this.bottomRight.style, {
+      position: 'absolute',
+      bottom: '0',
+      right: '0',
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '8px',
+      alignItems: 'flex-end',
+      padding: `0 calc(14px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) 0`,
+      pointerEvents: 'none',
+    });
+
+    // --- Gift button (login rewards) ---
     if (onGiftToggle) {
       const giftBtn = document.createElement('button');
       this.giftBtn = giftBtn;
       giftBtn.textContent = '\uD83C\uDF81';
       Object.assign(giftBtn.style, {
-        position: 'absolute',
-        bottom: '0',
-        right: '0',
-        margin: `0 calc(200px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) 0`,
+        position: 'relative',
         minWidth: '48px',
         minHeight: '48px',
         fontSize: '20px',
@@ -201,21 +223,16 @@ export class HUD {
         border: '2px solid rgba(0,0,0,0.3)',
         display: 'none',
       });
-      giftBtn.style.position = 'absolute'; // ensure positioning context
       giftBtn.appendChild(dot);
 
-      this.root.appendChild(giftBtn);
+      this.bottomRight.appendChild(giftBtn);
     }
 
-    // --- Bottom-right: Daily button ---
+    // --- Daily button ---
     if (onDailyToggle) {
       const dailyBtn = document.createElement('button');
       dailyBtn.textContent = 'DAILY';
       Object.assign(dailyBtn.style, {
-        position: 'absolute',
-        bottom: '0',
-        right: '0',
-        margin: `0 calc(110px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) 0`,
         minWidth: '72px',
         minHeight: '48px',
         fontSize: '14px',
@@ -236,17 +253,13 @@ export class HUD {
         e.stopPropagation();
         onDailyToggle();
       });
-      this.root.appendChild(dailyBtn);
+      this.bottomRight.appendChild(dailyBtn);
     }
 
-    // --- Bottom-right: Shop button ---
+    // --- Shop button ---
     this.shopBtn = document.createElement('button');
     this.shopBtn.textContent = 'SHOP';
     Object.assign(this.shopBtn.style, {
-      position: 'absolute',
-      bottom: '0',
-      right: '0',
-      margin: `0 calc(14px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) 0`,
       minWidth: '80px',
       minHeight: '48px',
       fontSize: '16px',
@@ -267,7 +280,18 @@ export class HUD {
       e.stopPropagation();
       onShopToggle();
     });
-    this.root.appendChild(this.shopBtn);
+    this.bottomRight.appendChild(this.shopBtn);
+
+    this.root.appendChild(this.bottomRight);
+
+    // --- Portrait mode: stack right buttons vertically ---
+    this.portraitQuery = window.matchMedia('(orientation: portrait)');
+    const applyOrientation = (portrait: boolean) => {
+      this.bottomRight.style.flexDirection = portrait ? 'column-reverse' : 'row';
+    };
+    applyOrientation(this.portraitQuery.matches);
+    this.portraitHandler = () => applyOrientation(this.portraitQuery!.matches);
+    this.portraitQuery.addEventListener('change', this.portraitHandler);
 
     // --- 2X Boost button ---
     this.boostBtn = document.createElement('button');
@@ -459,6 +483,9 @@ export class HUD {
 
   dispose(): void {
     this.unsubscribe();
+    if (this.portraitQuery && this.portraitHandler) {
+      this.portraitQuery.removeEventListener('change', this.portraitHandler);
+    }
     this.root.remove();
   }
 }
