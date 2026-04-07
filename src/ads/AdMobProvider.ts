@@ -7,6 +7,7 @@ export class AdMobProvider implements AdProvider {
   private admob: any = null;
   private platform: 'ios' | 'android' = 'android';
   private readyMap: Map<string, boolean> = new Map();
+  private rewardEarned = false;
 
   async initialize(): Promise<void> {
     try {
@@ -22,6 +23,13 @@ export class AdMobProvider implements AdProvider {
 
       validateAdIds(this.platform);
       await AdMob.initialize({ initializeForTesting: !AD_PRODUCTION });
+
+      // Listen for reward earned event — only fires when user completes the ad
+      const { RewardAdPluginEvents } = await import('@capacitor-community/admob');
+      AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+        this.rewardEarned = true;
+      });
+
       console.log(`[AdMobProvider] Initialized (production=${AD_PRODUCTION})`);
     } catch (err) {
       console.warn('[AdMobProvider] Failed to initialize:', err);
@@ -62,16 +70,18 @@ export class AdMobProvider implements AdProvider {
       await this.loadRewarded(placement);
     }
     try {
+      this.rewardEarned = false;
       adAnalytics.emit('ad_shown', placement, this.name);
-      const result = await this.admob.showRewardVideoAd();
+      await this.admob.showRewardVideoAd();
       this.readyMap.set(placement, false);
-      if (result) {
+      const earned = this.rewardEarned;
+      if (earned) {
         adAnalytics.emit('ad_reward_earned', placement, this.name);
       }
       adAnalytics.emit('ad_dismissed', placement, this.name);
       // Pre-load next
       this.loadRewarded(placement).catch(() => {});
-      return true;
+      return earned;
     } catch (err: any) {
       adAnalytics.emit('ad_show_failed', placement, this.name, err?.message);
       this.readyMap.set(placement, false);

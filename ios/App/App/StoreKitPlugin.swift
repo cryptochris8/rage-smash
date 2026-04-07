@@ -18,6 +18,28 @@ public class StoreKitPlugin: CAPPlugin, CAPBridgedPlugin {
         "com.athletedomains.ragesmash.starterpack"
     ]
 
+    private var updateListenerTask: Task<Void, Never>?
+
+    /// Listen for transactions that complete outside the purchase flow
+    /// (e.g. pending Ask-to-Buy approvals, interrupted purchases, renewals).
+    public override func load() {
+        updateListenerTask = Task(priority: .background) {
+            for await result in Transaction.updates {
+                if case .verified(let transaction) = result {
+                    await transaction.finish()
+                    // Notify the JS layer so it can grant entitlements
+                    self.notifyListeners("transactionUpdate", data: [
+                        "productId": transaction.productID,
+                    ])
+                }
+            }
+        }
+    }
+
+    deinit {
+        updateListenerTask?.cancel()
+    }
+
     // MARK: - Load Products
 
     @objc func loadProducts(_ call: CAPPluginCall) {

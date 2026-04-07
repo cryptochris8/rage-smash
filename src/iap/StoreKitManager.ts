@@ -39,6 +39,7 @@ export class StoreKitManager {
   private products: Map<string, ProductInfo> = new Map();
   private isNative = false;
   private loaded = false;
+  private onTransactionUpdate: ((productId: string) => void) | null = null;
 
   async init(): Promise<void> {
     try {
@@ -59,6 +60,22 @@ export class StoreKitManager {
     } catch (err) {
       console.warn('[StoreKitManager] Failed to load products:', err);
     }
+
+    // Listen for transactions that complete outside the purchase flow
+    // (e.g. pending Ask-to-Buy approvals, interrupted purchases)
+    try {
+      await (StoreKit as any).addListener('transactionUpdate', (data: { productId: string }) => {
+        console.log('[StoreKitManager] Transaction update:', data.productId);
+        this.onTransactionUpdate?.(data.productId);
+      });
+    } catch (err) {
+      console.warn('[StoreKitManager] Failed to add transaction listener:', err);
+    }
+  }
+
+  /** Register a callback for transactions that complete asynchronously (pending, interrupted, etc.) */
+  setTransactionUpdateHandler(handler: (productId: string) => void): void {
+    this.onTransactionUpdate = handler;
   }
 
   /** Get product info (display price, name, etc.) */

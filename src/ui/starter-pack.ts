@@ -129,7 +129,7 @@ export class StarterPackUI {
     // Buy button
     const buyBtn = document.createElement('button');
     const displayPrice = this.storeKit.getDisplayPrice(PRODUCT_IDS.starterPack);
-    buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'CLAIM FREE';
+    buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'BUY $1.99';
     Object.assign(buyBtn.style, {
       display: 'block',
       width: '100%',
@@ -150,24 +150,23 @@ export class StarterPackUI {
     });
     buyBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
-      if (this.storeKit.isAvailable()) {
-        // Real IAP
-        buyBtn.textContent = 'Processing...';
-        buyBtn.style.pointerEvents = 'none';
-        const success = await this.storeKit.purchase(PRODUCT_IDS.starterPack);
-        if (success) {
-          this.starterPack.purchase();
-          this.audioManager.playDailyReward();
-          this.hide();
-        } else {
-          buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'BUY $1.99';
-          buyBtn.style.pointerEvents = 'auto';
-        }
-      } else {
-        // Web fallback — free gift
+      if (!this.storeKit.isAvailable()) {
+        // IAP not available — hide the modal, don't grant free rewards
+        console.warn('[StarterPackUI] StoreKit not available, cannot purchase');
+        this.hide();
+        return;
+      }
+      // Real IAP
+      buyBtn.textContent = 'Processing...';
+      buyBtn.style.pointerEvents = 'none';
+      const success = await this.storeKit.purchase(PRODUCT_IDS.starterPack);
+      if (success) {
         this.starterPack.purchase();
         this.audioManager.playDailyReward();
         this.hide();
+      } else {
+        buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'BUY $1.99';
+        buyBtn.style.pointerEvents = 'auto';
       }
     });
     card.appendChild(buyBtn);

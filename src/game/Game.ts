@@ -131,7 +131,22 @@ export class Game {
           this.store.update({ adsRemoved: true });
         }
         if (entitlements.includes(PRODUCT_IDS.starterPack)) {
-          this.store.update({ starterPackPurchased: true });
+          const hammerId = CONFIG.starterPackHammerId;
+          const unlockedHammers = this.store.state.unlockedHammers.includes(hammerId)
+            ? this.store.state.unlockedHammers
+            : [...this.store.state.unlockedHammers, hammerId];
+          this.store.update({ starterPackPurchased: true, unlockedHammers });
+        }
+      });
+
+      // Handle transactions that complete outside the purchase flow
+      // (e.g. pending Ask-to-Buy approvals, interrupted purchases)
+      this.storeKit.setTransactionUpdateHandler((productId) => {
+        if (productId === PRODUCT_IDS.removeAds) {
+          this.store.update({ adsRemoved: true });
+        } else if (productId === PRODUCT_IDS.starterPack && !this.store.state.starterPackPurchased) {
+          this.starterPackSystem.purchase();
+          this.audioManager.playDailyReward();
         }
       });
     }).catch((err) => console.warn('[Game] StoreKit init error:', err));
@@ -338,7 +353,11 @@ export class Game {
         restored.push('Remove Ads');
       }
       if (entitlements.includes(PRODUCT_IDS.starterPack)) {
-        this.store.update({ starterPackPurchased: true });
+        const hammerId = CONFIG.starterPackHammerId;
+        const unlockedHammers = this.store.state.unlockedHammers.includes(hammerId)
+          ? this.store.state.unlockedHammers
+          : [...this.store.state.unlockedHammers, hammerId];
+        this.store.update({ starterPackPurchased: true, unlockedHammers });
         restored.push('Starter Pack');
       }
       return restored;
