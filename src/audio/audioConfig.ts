@@ -50,6 +50,9 @@ export const AUDIO_CONFIG = {
   // --- Cinematic combo (replaces procedural at thresholds) ---
   cinematicComboVolume: 0.5,
 
+  // --- Music ---
+  musicVolume: 0.18,  // Background music sits well below SFX
+
   // --- Default volumes ---
   masterVolume: 0.7,
   uiVolume: 0.4,

@@ -39,6 +39,7 @@ import { StarterPackUI } from '../ui/starter-pack';
 import { PressSystem } from '../systems/press';
 import { PressHUD } from '../ui/press-hud';
 import { VoiceManager } from '../audio/VoiceManager';
+import { MusicManager } from '../audio/MusicManager';
 import { SessionGoalSystem } from '../systems/session-goals';
 import { RetentionChallengeSystem } from '../systems/retention-challenges';
 import { EventSystem } from '../systems/events';
@@ -76,6 +77,7 @@ export class Game {
   private starterPackSystem: StarterPackSystem;
   private smartBoostSystem: SmartBoostSystem;
   private voiceManager: VoiceManager;
+  private musicManager: MusicManager;
   private hud: HUD;
   private shop: Shop;
   private overlays: Overlays;
@@ -177,6 +179,7 @@ export class Game {
     // Audio — new layered AudioManager (replaces old AudioSystem)
     this.audioManager = new AudioManager(this.store);
     this.voiceManager = new VoiceManager(this.store);
+    this.musicManager = new MusicManager(this.store);
 
     // Haptics & Ads
     this.hapticsSystem = new HapticsSystem();
@@ -397,6 +400,7 @@ export class Game {
 
         // Voice line (handles cooldowns/probability internally)
         this.voiceManager.onSmash(this.lastSmashPower, streak, this.lastSmashRarity, this.lastSmashPack);
+        this.musicManager.duck(500);
 
         // Smart boost suggestion
         if (this.smartBoostSystem.checkTrigger(earned)) {
@@ -495,6 +499,7 @@ export class Game {
     const earlyUnlock = () => {
       this.audioManager.unlock();
       this.voiceManager.setAudioContext(this.audioManager.getContext()!);
+      this.musicManager.setContext(this.audioManager.getContext()!);
       container.removeEventListener('pointerdown', earlyUnlock);
     };
     container.addEventListener('pointerdown', earlyUnlock);
@@ -512,6 +517,7 @@ export class Game {
       } else if (document.visibilityState === 'visible') {
         // Resume audio after returning from ad or background
         this.audioManager.resume();
+        this.musicManager.resume();
       }
     });
 
@@ -541,6 +547,7 @@ export class Game {
 
     this.audioManager.unlock();
     this.voiceManager.setAudioContext(this.audioManager.getContext()!);
+    this.musicManager.setContext(this.audioManager.getContext()!);
 
     // Track smash context for voice system
     this.lastSmashPower = 1;
@@ -613,6 +620,7 @@ export class Game {
 
     this.audioManager.unlock();
     this.voiceManager.setAudioContext(this.audioManager.getContext()!);
+    this.musicManager.setContext(this.audioManager.getContext()!);
     this.chargeSystem.startCharge();
     this.audioManager.playChargeStart();
   }
@@ -961,6 +969,9 @@ export class Game {
     this.particleSystem.update(dt);
     this.smashSystem.update(dt);
     this.pressSystem.update(dt);
+
+    // Adaptive music intensity tracks streak
+    this.musicManager.update(this.store.state.streak);
 
     this.renderer.render(this.scene, this.camera);
   }
