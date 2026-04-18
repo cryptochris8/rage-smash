@@ -98,6 +98,8 @@ export interface GameState {
   smashesSincePress: number;
   // IAP
   adsRemoved: boolean;
+  // Collection: object ids the player has smashed at least once
+  seenObjects: string[];
 }
 
 export function createInitialState(): GameState {
@@ -137,6 +139,7 @@ export function createInitialState(): GameState {
     pressProgress: 0,
     smashesSincePress: 0,
     adsRemoved: false,
+    seenObjects: [],
   };
 }
 

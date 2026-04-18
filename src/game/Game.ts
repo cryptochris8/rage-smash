@@ -49,6 +49,7 @@ import { EventSystem } from '../systems/events';
 import { GoalsPanel } from '../ui/goals-panel';
 import { ProgressPrompt } from '../ui/progress-prompt';
 import { SettingsUI } from '../ui/settings';
+import { CollectionUI } from '../ui/collection';
 import { Tutorial } from '../ui/tutorial';
 import { GameAnalytics } from '../systems/analytics';
 import { OBJECTS } from '../content/objects';
@@ -99,6 +100,7 @@ export class Game {
   private pressSystem: PressSystem;
   private pressHUD: PressHUD;
   private settingsUI: SettingsUI;
+  private collectionUI!: CollectionUI;
   private analytics: GameAnalytics;
   private storeKit: StoreKitManager;
   private nextIsPress: boolean = false;
@@ -377,7 +379,13 @@ export class Game {
     }, () => {
       // Reset — stop auto-save before localStorage is cleared
       this.saveSystem.stopAutoSave();
+    }, () => {
+      // Collection opener — hide settings first so the modal can sit on top cleanly.
+      this.settingsUI.hide();
+      this.collectionUI.show();
     });
+
+    this.collectionUI = new CollectionUI(container, this.store);
 
     // Initial goals panel update
     this.updateGoalsPanel();

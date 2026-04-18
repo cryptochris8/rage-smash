@@ -385,6 +385,12 @@ export class SmashSystem {
 
     const bestCombo = Math.max(state.bestCombo, result.multiplier);
 
+    // Record in the collection. Only append when it's a new id so we don't
+    // churn the array (and with it the save write) on repeats.
+    const seenUpdate = def && !state.seenObjects.includes(def.id)
+      ? { seenObjects: [...state.seenObjects, def.id] }
+      : null;
+
     this.store.update({
       coins: state.coins + finalCoins,
       streak: newStreak,
@@ -394,6 +400,7 @@ export class SmashSystem {
       currentObjectId: null,
       jackpotActive: jackpot.triggered,
       jackpotMultiplier: jackpot.multiplier,
+      ...(seenUpdate ?? {}),
     });
 
     // Jackpot visual effects

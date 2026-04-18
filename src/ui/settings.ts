@@ -6,6 +6,7 @@ import {
   isScreenShakeEnabled,
   setScreenShakeEnabled,
 } from '../systems/motion-prefs';
+import { OBJECTS } from '../content/objects';
 
 export class SettingsUI {
   private container: HTMLElement;
@@ -16,6 +17,7 @@ export class SettingsUI {
   private onRemoveAds: () => Promise<boolean>;
   private onRestore: () => Promise<string[]>;
   private onReset: () => void;
+  private onOpenCollection: () => void;
 
   constructor(
     container: HTMLElement,
@@ -25,6 +27,7 @@ export class SettingsUI {
     onRemoveAds?: () => Promise<boolean>,
     onRestore?: () => Promise<string[]>,
     onReset?: () => void,
+    onOpenCollection?: () => void,
   ) {
     this.container = container;
     this.store = store;
@@ -33,6 +36,7 @@ export class SettingsUI {
     this.onRemoveAds = onRemoveAds ?? (async () => false);
     this.onRestore = onRestore ?? (async () => []);
     this.onReset = onReset ?? (() => {});
+    this.onOpenCollection = onOpenCollection ?? (() => {});
   }
 
   show(): void {
@@ -215,6 +219,13 @@ export class SettingsUI {
     // Stats section
     const stats = this.analytics.getStats();
     panel.appendChild(this.createLabel('STATS'));
+
+    // Collection entry point — shows completion % and opens the grid modal.
+    const seenCount = this.store.state.seenObjects.length;
+    const totalObjects = OBJECTS.length;
+    const percent = totalObjects === 0 ? 0 : Math.round((seenCount / totalObjects) * 100);
+    panel.appendChild(this.createCollectionButton(seenCount, totalObjects, percent));
+
     panel.appendChild(this.createStatRow('Sessions', stats.totalSessions.toLocaleString()));
     panel.appendChild(this.createStatRow('Total Smashes', stats.totalSmashes.toLocaleString()));
     panel.appendChild(this.createStatRow('Coins Earned', stats.totalCoinsEarned.toLocaleString()));
@@ -328,6 +339,50 @@ export class SettingsUI {
 
     row.appendChild(lbl);
     row.appendChild(toggle);
+    return row;
+  }
+
+  private createCollectionButton(seen: number, total: number, percent: number): HTMLDivElement {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      background: 'rgba(110,168,254,0.10)',
+      border: '1px solid rgba(110,168,254,0.28)',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      WebkitTapHighlightColor: 'transparent',
+      marginBottom: '4px',
+    });
+
+    const left = document.createElement('div');
+    const lbl = document.createElement('div');
+    lbl.textContent = 'Collection';
+    Object.assign(lbl.style, { fontSize: '15px', color: '#ffffff', fontWeight: '700' });
+    const sub = document.createElement('div');
+    sub.textContent = `${seen} / ${total} discovered`;
+    Object.assign(sub.style, { fontSize: '12px', color: 'rgba(255,255,255,0.55)', marginTop: '2px' });
+    left.appendChild(lbl);
+    left.appendChild(sub);
+
+    const right = document.createElement('div');
+    right.textContent = `${percent}% \u203A`;
+    Object.assign(right.style, {
+      fontSize: '14px',
+      fontWeight: '800',
+      color: '#6ea8fe',
+      letterSpacing: '1px',
+    });
+
+    row.appendChild(left);
+    row.appendChild(right);
+    row.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.onOpenCollection();
+    });
     return row;
   }
 

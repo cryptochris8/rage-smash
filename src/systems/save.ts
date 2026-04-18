@@ -23,6 +23,7 @@ interface SaveData {
   dailyStreak: number;
   jackpotBoostExpiresAt: number;
   adsRemoved: boolean;
+  seenObjects: string[];
 }
 
 export class SaveSystem {
@@ -69,6 +70,7 @@ export class SaveSystem {
       if (typeof data.dailyStreak === 'number') updates.dailyStreak = data.dailyStreak;
       if (typeof data.jackpotBoostExpiresAt === 'number') updates.jackpotBoostExpiresAt = data.jackpotBoostExpiresAt;
       if (typeof data.adsRemoved === 'boolean') updates.adsRemoved = data.adsRemoved;
+      if (Array.isArray(data.seenObjects)) updates.seenObjects = data.seenObjects;
 
       if (Object.keys(updates).length > 0) {
         this.store.update(updates);
@@ -101,6 +103,7 @@ export class SaveSystem {
         dailyStreak: state.dailyStreak,
         jackpotBoostExpiresAt: state.jackpotBoostExpiresAt,
         adsRemoved: state.adsRemoved,
+        seenObjects: state.seenObjects,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch {
