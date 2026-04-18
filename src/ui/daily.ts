@@ -1,5 +1,6 @@
 import { Store } from '../game/state';
 import { DailyChallenge, DailyChallengeResult, CHALLENGE_OBJECT_COUNT } from '../systems/daily';
+import { share, formatDailyScore, showShareToast } from '../systems/share';
 
 const FONT_FAMILY =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -490,13 +491,30 @@ export class DailyUI {
       center.appendChild(list);
     }
 
-    // Close button
+    // Action row: Share + Close
+    const actions = document.createElement('div');
+    Object.assign(actions.style, {
+      display: 'flex',
+      gap: '10px',
+      justifyContent: 'center',
+    });
+
+    const shareBtn = this.createSecondaryButton('\uD83D\uDCE4 SHARE');
+    shareBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      const out = await share({ text: formatDailyScore(result.score), title: 'Rage Smash — Daily Challenge' });
+      showShareToast(this.container, out.message);
+    });
+    actions.appendChild(shareBtn);
+
     const closeBtn = this.createSecondaryButton('CLOSE');
     closeBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.hideAndNotify();
     });
-    center.appendChild(closeBtn);
+    actions.appendChild(closeBtn);
+
+    center.appendChild(actions);
 
     wrapper.appendChild(center);
     this.root.appendChild(wrapper);

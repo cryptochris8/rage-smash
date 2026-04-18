@@ -1,5 +1,6 @@
 import { Store } from '../game/state';
 import { DailyChallenge } from '../systems/daily';
+import { share, formatBestCombo, formatDailyScore, showShareToast } from '../systems/share';
 
 const FONT_FAMILY =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -103,6 +104,38 @@ export class LeaderboardUI {
       textShadow: '0 2px 8px rgba(0,0,0,0.4)',
     });
 
+    const headerRight = document.createElement('div');
+    Object.assign(headerRight.style, { display: 'flex', gap: '8px', alignItems: 'center' });
+
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = '\uD83D\uDCE4';
+    Object.assign(shareBtn.style, {
+      background: 'rgba(110,168,254,0.18)',
+      border: '1px solid rgba(110,168,254,0.35)',
+      borderRadius: '50%',
+      width: '44px',
+      height: '44px',
+      fontSize: '18px',
+      color: '#ffffff',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'auto',
+      WebkitTapHighlightColor: 'transparent',
+      transition: 'background 0.15s ease',
+    });
+    shareBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      // Prefer the most impressive stat available — top daily score if present, else best combo.
+      const bestDaily = this.daily.getAllResults().reduce((m, r) => Math.max(m, r.score), 0);
+      const bestCombo = this.store.state.bestCombo;
+      const text = bestDaily > 0 ? formatDailyScore(bestDaily) : formatBestCombo(bestCombo);
+      const out = await share({ text, title: 'Rage Smash' });
+      showShareToast(this.container, out.message);
+    });
+    headerRight.appendChild(shareBtn);
+
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '\u2715';
     Object.assign(closeBtn.style, {
@@ -126,9 +159,10 @@ export class LeaderboardUI {
       e.stopPropagation();
       this.hide();
     });
+    headerRight.appendChild(closeBtn);
 
     header.appendChild(title);
-    header.appendChild(closeBtn);
+    header.appendChild(headerRight);
     wrapper.appendChild(header);
 
     // --- Stats Section ---

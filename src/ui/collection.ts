@@ -1,6 +1,7 @@
 import { Store } from '../game/state';
 import { OBJECTS } from '../content/objects';
 import { PACKS } from '../content/packs';
+import { share, formatCollection, showShareToast } from '../systems/share';
 
 export class CollectionUI {
   private container: HTMLElement;
@@ -56,6 +57,35 @@ export class CollectionUI {
       letterSpacing: '2px',
     });
 
+    const headerRight = document.createElement('div');
+    Object.assign(headerRight.style, { display: 'flex', gap: '4px', alignItems: 'center' });
+
+    const shareBtn = document.createElement('button');
+    shareBtn.textContent = '\uD83D\uDCE4';
+    Object.assign(shareBtn.style, {
+      fontSize: '20px',
+      background: 'rgba(110,168,254,0.18)',
+      border: '1px solid rgba(110,168,254,0.35)',
+      borderRadius: '50%',
+      width: '40px',
+      height: '40px',
+      color: '#ffffff',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      WebkitTapHighlightColor: 'transparent',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
+    shareBtn.addEventListener('pointerdown', async (e) => {
+      e.stopPropagation();
+      const out = await share({
+        text: formatCollection(discovered, total),
+        title: 'Rage Smash — Collection',
+      });
+      showShareToast(this.container, out.message);
+    });
+
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '\u2715';
     Object.assign(closeBtn.style, {
@@ -73,8 +103,11 @@ export class CollectionUI {
       this.hide();
     });
 
+    headerRight.appendChild(shareBtn);
+    headerRight.appendChild(closeBtn);
+
     header.appendChild(title);
-    header.appendChild(closeBtn);
+    header.appendChild(headerRight);
     this.root.appendChild(header);
 
     // Completion progress
