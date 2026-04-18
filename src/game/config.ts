@@ -162,6 +162,11 @@ export const CONFIG = {
   upgradeSpeedBonus: 0.07,    // -7% cooldown per level
   upgradeMultiplierBonus: 0.07, // +7% faster combo per level
 
+  // --- Press Upgrades ---
+  pressUpgradePowerBonus: 0.25,     // +25% press coins per level
+  pressUpgradeSpeedBonus: 0.15,     // -15% press cycle time per level
+  pressUpgradeFragmentsBonus: 0.20, // +20% press fragments per level
+
   // --- Coin Randomization ---
   coinRandomRange: 0.2,  // ±20% randomization on base coins
 

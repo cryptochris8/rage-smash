@@ -25,6 +25,7 @@ interface SaveData {
   adsRemoved: boolean;
   seenObjects: string[];
   unlockedAchievements: string[];
+  pressUpgrades: { power: number; speed: number; fragments: number };
 }
 
 export class SaveSystem {
@@ -73,6 +74,14 @@ export class SaveSystem {
       if (typeof data.adsRemoved === 'boolean') updates.adsRemoved = data.adsRemoved;
       if (Array.isArray(data.seenObjects)) updates.seenObjects = data.seenObjects;
       if (Array.isArray(data.unlockedAchievements)) updates.unlockedAchievements = data.unlockedAchievements;
+      if (data.pressUpgrades && typeof data.pressUpgrades === 'object') {
+        const pu = data.pressUpgrades as Partial<{ power: number; speed: number; fragments: number }>;
+        updates.pressUpgrades = {
+          power: typeof pu.power === 'number' ? pu.power : 0,
+          speed: typeof pu.speed === 'number' ? pu.speed : 0,
+          fragments: typeof pu.fragments === 'number' ? pu.fragments : 0,
+        };
+      }
 
       if (Object.keys(updates).length > 0) {
         this.store.update(updates);
@@ -107,6 +116,7 @@ export class SaveSystem {
         adsRemoved: state.adsRemoved,
         seenObjects: state.seenObjects,
         unlockedAchievements: state.unlockedAchievements,
+        pressUpgrades: state.pressUpgrades,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch {

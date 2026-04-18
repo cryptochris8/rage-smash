@@ -2,7 +2,7 @@ import { Store, Pack, HammerSkin } from '../game/state';
 import { PACKS } from '../content/packs';
 import { HAMMER_SKINS } from '../content/skins';
 import { ROOMS } from '../content/rooms';
-import { UPGRADES } from '../content/upgrades';
+import { UPGRADES, PRESS_UPGRADES } from '../content/upgrades';
 import {
   canUnlockPack,
   unlockPack,
@@ -14,6 +14,9 @@ import {
   getUpgradeLevel,
   canUpgrade,
   doUpgrade,
+  getPressUpgradeLevel,
+  canPressUpgrade,
+  doPressUpgrade,
 } from '../game/progression';
 import { getUpgradeCost } from '../game/economy';
 import { CONFIG } from '../game/config';
@@ -517,6 +520,71 @@ export class Shop {
           });
           card.appendChild(rescueBtn);
         }
+      }
+
+      this.upgradesSection.appendChild(card);
+    }
+
+    // --- Press upgrades section ---
+    const pressLabel = document.createElement('div');
+    pressLabel.textContent = 'PRESS UPGRADES';
+    Object.assign(pressLabel.style, {
+      fontSize: '11px',
+      fontWeight: '800',
+      color: 'rgba(255,255,255,0.45)',
+      letterSpacing: '2px',
+      padding: '14px 4px 4px',
+    });
+    this.upgradesSection.appendChild(pressLabel);
+
+    for (const upgrade of PRESS_UPGRADES) {
+      const level = getPressUpgradeLevel(this.store, upgrade.id);
+      const maxed = level >= CONFIG.upgradeMaxLevel;
+      const affordable = canPressUpgrade(this.store, upgrade.id);
+      const cost = maxed ? 0 : getUpgradeCost(level);
+      const card = this.createCard();
+
+      const icon = document.createElement('div');
+      icon.textContent = upgrade.icon;
+      icon.style.fontSize = '24px';
+      icon.style.flexShrink = '0';
+      card.appendChild(icon);
+
+      const info = document.createElement('div');
+      info.style.flex = '1';
+
+      const name = document.createElement('div');
+      name.textContent = `${upgrade.name} Lv.${level}`;
+      Object.assign(name.style, {
+        fontSize: '15px',
+        fontWeight: '700',
+        color: '#ffffff',
+        marginBottom: '2px',
+      });
+
+      const desc = document.createElement('div');
+      desc.textContent = upgrade.description;
+      Object.assign(desc.style, {
+        fontSize: '12px',
+        color: 'rgba(255,255,255,0.5)',
+      });
+
+      info.appendChild(name);
+      info.appendChild(desc);
+      card.appendChild(info);
+
+      if (maxed) {
+        card.appendChild(this.createBadge('MAX', '#6366f1'));
+      } else if (affordable) {
+        const btn = this.createBuyButton(`\uD83E\uDE99 ${cost}`);
+        btn.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          doPressUpgrade(this.store, upgrade.id);
+          if (this.onUpgradePurchase) this.onUpgradePurchase();
+        });
+        card.appendChild(btn);
+      } else {
+        card.appendChild(this.createBadge(`\uD83E\uDE99 ${cost}`, '#4b5563', true));
       }
 
       this.upgradesSection.appendChild(card);

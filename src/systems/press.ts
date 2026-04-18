@@ -120,13 +120,19 @@ export class PressSystem {
     this.crushFragmentsEmitted = 0;
   }
 
+  /** 1 → 1 at speedLevel 0, shrinks with each level (min clamp 40%). */
+  private speedScale(): number {
+    const level = this.store.state.pressUpgrades.speed;
+    return Math.max(0.4, 1 - level * CONFIG.pressUpgradeSpeedBonus);
+  }
+
   update(dt: number): void {
     if (this.phase === 'idle') return;
 
     this.timer += dt;
 
     if (this.phase === 'descending') {
-      const t = Math.min(this.timer / CONFIG.pressDescentDuration, 1);
+      const t = Math.min(this.timer / (CONFIG.pressDescentDuration * this.speedScale()), 1);
       const eased = t * t; // ease-in-quad
       const y = CONFIG.pressRestY + (CONFIG.pressCrushY - CONFIG.pressRestY) * eased;
       this.press.position.y = y;
@@ -149,7 +155,7 @@ export class PressSystem {
         this.timer = 0;
       }
     } else if (this.phase === 'crushing') {
-      const t = Math.min(this.timer / CONFIG.pressCrushDuration, 1);
+      const t = Math.min(this.timer / (CONFIG.pressCrushDuration * this.speedScale()), 1);
 
       // Flatten to 10% Y scale
       if (this.targetObject) {
@@ -180,7 +186,7 @@ export class PressSystem {
         this.timer = 0;
       }
     } else if (this.phase === 'rising') {
-      const t = Math.min(this.timer / CONFIG.pressRiseDuration, 1);
+      const t = Math.min(this.timer / (CONFIG.pressRiseDuration * this.speedScale()), 1);
       const eased = 1 - (1 - t) * (1 - t); // ease-out-quad
       const y = CONFIG.pressCrushY + (CONFIG.pressRestY - CONFIG.pressCrushY) * eased;
       this.press.position.y = y;
@@ -207,11 +213,15 @@ export class PressSystem {
     const def = currentObjectId ? OBJECTS.find((o) => o.id === currentObjectId) : null;
     const theme = def?.particleTheme;
 
-    // Lateral crushed fragments
+    // Lateral crushed fragments — scaled by the Press Fragments upgrade.
+    const fragLevel = this.store.state.pressUpgrades.fragments;
+    const extraFragments = Math.round(
+      CONFIG.pressFragmentCount * (1 + fragLevel * CONFIG.pressUpgradeFragmentsBonus),
+    );
     this.fragmentManager.explodeCrushed(
       position,
       color,
-      CONFIG.pressFragmentCount,
+      extraFragments,
       def?.color ? [color] : undefined,
     );
 
@@ -231,10 +241,12 @@ export class PressSystem {
     const adMultiplier = this.adSystem.getRewardMultiplier();
     const starterBoost = this.starterPackSystem.getBoostMultiplier();
     const eventBonus = def ? 1 + this.eventSystem.getRewardBonus(def.pack) : 1;
+    // Press Power upgrade boosts the press's fixed multiplier directly.
+    const pressPowerBoost = 1 + state.pressUpgrades.power * CONFIG.pressUpgradePowerBonus;
     const result = calculateCoins(
       rarity,
       newStreak,
-      CONFIG.pressMultiplier,
+      CONFIG.pressMultiplier * pressPowerBoost,
       adMultiplier * starterBoost * eventBonus,
       state.powerLevel,
     );

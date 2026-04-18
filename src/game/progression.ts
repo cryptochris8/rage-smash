@@ -2,7 +2,7 @@ import { Store } from './state';
 import { PACKS } from '../content/packs';
 import { HAMMER_SKINS } from '../content/skins';
 import { ROOMS } from '../content/rooms';
-import { UPGRADES, UpgradeCategory } from '../content/upgrades';
+import { UPGRADES, UpgradeCategory, PressUpgradeCategory } from '../content/upgrades';
 import { getUpgradeCost } from './economy';
 import { CONFIG } from './config';
 
@@ -121,5 +121,44 @@ export function doUpgrade(store: Store, category: UpgradeCategory): boolean {
   }
 
   store.update(updates);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Press upgrades — same cost curve and max level, separate state field.
+// ---------------------------------------------------------------------------
+
+export function getPressUpgradeLevel(store: Store, category: PressUpgradeCategory): number {
+  const pu = store.state.pressUpgrades;
+  switch (category) {
+    case 'pressPower': return pu.power;
+    case 'pressSpeed': return pu.speed;
+    case 'pressFragments': return pu.fragments;
+  }
+}
+
+export function canPressUpgrade(store: Store, category: PressUpgradeCategory): boolean {
+  const level = getPressUpgradeLevel(store, category);
+  if (level >= CONFIG.upgradeMaxLevel) return false;
+  return store.state.coins >= getUpgradeCost(level);
+}
+
+export function doPressUpgrade(store: Store, category: PressUpgradeCategory): boolean {
+  if (!canPressUpgrade(store, category)) return false;
+
+  const level = getPressUpgradeLevel(store, category);
+  const cost = getUpgradeCost(level);
+  const pu = { ...store.state.pressUpgrades };
+
+  switch (category) {
+    case 'pressPower':     pu.power = level + 1; break;
+    case 'pressSpeed':     pu.speed = level + 1; break;
+    case 'pressFragments': pu.fragments = level + 1; break;
+  }
+
+  store.update({
+    coins: store.state.coins - cost,
+    pressUpgrades: pu,
+  });
   return true;
 }

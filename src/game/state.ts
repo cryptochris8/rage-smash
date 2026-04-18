@@ -102,6 +102,8 @@ export interface GameState {
   seenObjects: string[];
   // Achievements: ids of milestones the player has unlocked
   unlockedAchievements: string[];
+  // Press upgrades: level 0..upgradeMaxLevel for each track
+  pressUpgrades: { power: number; speed: number; fragments: number };
 }
 
 export function createInitialState(): GameState {
@@ -143,6 +145,7 @@ export function createInitialState(): GameState {
     adsRemoved: false,
     seenObjects: [],
     unlockedAchievements: [],
+    pressUpgrades: { power: 0, speed: 0, fragments: 0 },
   };
 }
 
