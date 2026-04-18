@@ -40,6 +40,12 @@ export interface RoomDef {
   name: string;
   skybox: string;
   cost: number;
+  // Optional lighting profile — falls back to CONFIG defaults when omitted.
+  ambientColor?: number;
+  ambientIntensity?: number;
+  directionalColor?: number;
+  directionalIntensity?: number;
+  directionalPosition?: [number, number, number];
 }
 
 export interface Pack {

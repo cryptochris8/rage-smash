@@ -4,7 +4,7 @@ import { Store, createInitialState } from './state';
 import { createRenderer } from '../render/renderer';
 import { createScene, switchRoom } from '../render/scene';
 import { createCamera } from '../render/camera';
-import { setupLighting, SceneLights } from '../render/lighting';
+import { setupLighting, applyRoomLighting, SceneLights } from '../render/lighting';
 import { createPedestal } from '../render/objects/pedestal';
 import { SmashableManager } from '../render/objects/smashable';
 import { FragmentManager } from '../render/objects/fragments';
@@ -169,6 +169,7 @@ export class Game {
     this.scene = createScene(this.store.state.selectedRoom);
     this.camera = createCamera(container);
     this.lights = setupLighting(this.scene);
+    applyRoomLighting(this.lights, this.store.state.selectedRoom);
     createPedestal(this.scene);
 
     // 3D model manager — preload registered GLB assets
@@ -276,6 +277,8 @@ export class Game {
     );
     this.shop = new Shop(container, this.store, (roomId) => {
       switchRoom(this.scene, roomId);
+      applyRoomLighting(this.lights, roomId);
+      this.updateStreakHeat(this.store.state.streak);
     }, () => {
       this.retentionChallengeSystem.recordUpgrade();
       this.updateGoalsPanel();
@@ -786,15 +789,29 @@ export class Game {
       if (streak >= thresholds[i]) tier = i + 1;
     }
 
+    // Heat factor 0..1 = tier / tierCount. We compose with the room base rather
+    // than overwrite, so Neon/Luxury/Dungeon atmosphere survives low streaks and
+    // warms up (toward the tier's hot hue) as combos rise.
+    const heat = Math.min(tier / thresholds.length, 1);
+
     const ambientColors = CONFIG.streakHeatColors.ambient as number[];
     const directionalColors = CONFIG.streakHeatColors.directional as number[];
 
-    const ambientColor = ambientColors[Math.min(tier, ambientColors.length - 1)];
-    const directionalColor = directionalColors[Math.min(tier, directionalColors.length - 1)];
+    const ambientHot = ambientColors[Math.min(tier, ambientColors.length - 1)];
+    const directionalHot = directionalColors[Math.min(tier, directionalColors.length - 1)];
 
-    this.lights.ambient.color.setHex(ambientColor);
-    this.lights.directional.color.setHex(directionalColor);
+    // Lerp from the room-defined base toward the heat color by `heat`.
+    this.lights.ambient.color.copy(this.lights.baseAmbientColor).lerp(
+      this.tmpHeatColor.setHex(ambientHot),
+      heat,
+    );
+    this.lights.directional.color.copy(this.lights.baseDirectionalColor).lerp(
+      this.tmpHeatColor.setHex(directionalHot),
+      heat,
+    );
   }
+
+  private tmpHeatColor = new THREE.Color();
 
   // --- 2X Boost ---
 
