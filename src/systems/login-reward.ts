@@ -52,9 +52,15 @@ export class LoginRewardSystem {
     return Date.now() - this.state.lastClaimTimestamp >= CONFIG.loginRewardCooldownMs;
   }
 
-  claim(): { coins: number; dayIndex: number; isDay7: boolean; streak: number } {
+  claim(): { coins: number; dayIndex: number; isDay7: boolean; streak: number; isComeback: boolean } {
     const dayIndex = this.state.currentDayIndex;
-    const coins = CONFIG.loginRewards[dayIndex];
+    const baseCoins = CONFIG.loginRewards[dayIndex];
+
+    // Comeback: player missed a day (elapsed > 24h cooldown + 24h grace = 48h)
+    // but returned before the 72h hard-reset window.
+    const elapsed = this.state.lastClaimTimestamp === 0 ? 0 : Date.now() - this.state.lastClaimTimestamp;
+    const isComeback = elapsed > 48 * 60 * 60 * 1000;
+    const coins = isComeback ? Math.round(baseCoins * 1.2) : baseCoins;
 
     this.state.lastClaimTimestamp = Date.now();
     this.state.totalDaysClaimed++;
@@ -68,7 +74,7 @@ export class LoginRewardSystem {
 
     this.save();
 
-    return { coins, dayIndex, isDay7, streak: this.state.consecutiveStreak };
+    return { coins, dayIndex, isDay7, streak: this.state.consecutiveStreak, isComeback };
   }
 
   getDayRewards(): DayReward[] {
@@ -98,11 +104,22 @@ export class LoginRewardSystem {
     return this.state.jackpotBoostExpiresAt;
   }
 
+  /**
+   * True if the player missed a single day but can still claim without losing their streak.
+   * Used by UI to surface a comeback badge before claiming.
+   */
+  isInGracePeriod(): boolean {
+    if (this.state.lastClaimTimestamp === 0) return false;
+    const elapsed = Date.now() - this.state.lastClaimTimestamp;
+    return elapsed > 48 * 60 * 60 * 1000 && elapsed <= 72 * 60 * 60 * 1000;
+  }
+
   private checkStreakReset(): void {
     if (this.state.lastClaimTimestamp === 0) return;
     const elapsed = Date.now() - this.state.lastClaimTimestamp;
-    // If more than 48h since last claim, reset streak and day index
-    if (elapsed > 48 * 60 * 60 * 1000) {
+    // Grace period: one missed day (48-72h) keeps the streak alive with a comeback bonus.
+    // Only a second consecutive miss (>72h) resets.
+    if (elapsed > 72 * 60 * 60 * 1000) {
       this.state.consecutiveStreak = 0;
       this.state.currentDayIndex = 0;
       this.save();

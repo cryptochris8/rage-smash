@@ -315,6 +315,70 @@ export class Overlays {
     requestAnimationFrame(animate);
   }
 
+  /** Green "SAVED!" label when combo survives an overcharge (one per session) */
+  showSaved(): void {
+    const el = document.createElement('div');
+    el.textContent = 'SAVED!';
+    Object.assign(el.style, {
+      position: 'absolute',
+      left: '50%',
+      top: '45%',
+      transform: 'translate(-50%, -50%) scale(0.4)',
+      fontSize: '36px',
+      fontWeight: '900',
+      color: '#22c55e',
+      textShadow: '0 0 24px rgba(34,197,94,0.8), 0 0 48px rgba(34,197,94,0.4), 0 2px 8px rgba(0,0,0,0.5)',
+      pointerEvents: 'none',
+      zIndex: '55',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      opacity: '0',
+      willChange: 'transform, opacity',
+      letterSpacing: '3px',
+    });
+
+    this.container.appendChild(el);
+
+    const duration = 900;
+    const start = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+
+      let scale: number;
+      let opacity: number;
+
+      if (t < 0.18) {
+        const tIn = t / 0.18;
+        const ease = 1 - Math.pow(1 - tIn, 3);
+        scale = 0.4 + 1.0 * ease;
+        opacity = ease;
+      } else if (t < 0.35) {
+        const tSettle = (t - 0.18) / 0.17;
+        scale = 1.4 - 0.3 * tSettle;
+        opacity = 1;
+      } else {
+        const tOut = (t - 0.35) / 0.65;
+        scale = 1.1;
+        opacity = 1 - tOut * tOut;
+      }
+
+      el.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      el.style.opacity = String(Math.max(0, opacity));
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        el.remove();
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+
   /** Gold "JACKPOT! x7" label with scale-in + glow + fade */
   showJackpotLabel(multiplier: number): void {
     const el = document.createElement('div');

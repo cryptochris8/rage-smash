@@ -1,5 +1,11 @@
 import { Store } from '../game/state';
 import { GameAnalytics } from '../systems/analytics';
+import {
+  isReducedMotion,
+  setReducedMotion,
+  isScreenShakeEnabled,
+  setScreenShakeEnabled,
+} from '../systems/motion-prefs';
 
 export class SettingsUI {
   private container: HTMLElement;
@@ -108,6 +114,16 @@ export class SettingsUI {
     panel.appendChild(this.createToggle('Haptics', hapticsEnabled, (on) => {
       localStorage.setItem('rage-smash-haptics', on ? 'on' : 'off');
       this.onHapticsToggle(on);
+    }));
+
+    // Screen Shake toggle (independent fine control)
+    panel.appendChild(this.createToggle('Screen Shake', isScreenShakeEnabled(), (on) => {
+      setScreenShakeEnabled(on);
+    }));
+
+    // Reduced Motion toggle (disables shake + zoom punch, 70% fewer particles)
+    panel.appendChild(this.createToggle('Reduced Motion', isReducedMotion(), (on) => {
+      setReducedMotion(on);
     }));
 
     // Remove Ads + Restore (only show on native where ads exist)

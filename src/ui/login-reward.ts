@@ -74,6 +74,24 @@ export class LoginRewardUI {
       this.root.appendChild(streakText);
     }
 
+    // Comeback badge: shown if the player missed a day but streak survived the grace window.
+    if (this.loginSystem.isInGracePeriod()) {
+      const comeback = document.createElement('div');
+      comeback.textContent = 'Comeback bonus: +20% coins';
+      Object.assign(comeback.style, {
+        fontSize: '13px',
+        fontWeight: '800',
+        color: '#22c55e',
+        background: 'rgba(34,197,94,0.12)',
+        border: '1px solid rgba(34,197,94,0.35)',
+        padding: '6px 12px',
+        borderRadius: '999px',
+        marginBottom: '16px',
+        letterSpacing: '1px',
+      });
+      this.root.appendChild(comeback);
+    }
+
     // Grid of 7 days
     const grid = document.createElement('div');
     Object.assign(grid.style, {

@@ -355,6 +355,14 @@ function buildObject(def: SmashableObjectDef): THREE.Group {
 // SmashableManager
 // ---------------------------------------------------------------------------
 
+interface EmissiveCache {
+  color: THREE.Color;
+  intensity: number;
+}
+
+const DANGER_COLOR = 0xffaa22;
+const TMP_COLOR = new THREE.Color();
+
 export class SmashableManager {
   private scene: THREE.Scene;
   private modelManager: ModelManager | null = null;
@@ -363,6 +371,14 @@ export class SmashableManager {
   private targetScale: THREE.Vector3 = new THREE.Vector3(1, 1, 1);
   private elapsedTime: number = 0;
   private baseY: number = CONFIG.objectSpawnY;
+
+  // Charge-glow state: the materials we've modified so we can restore them.
+  private emissiveCache: Map<THREE.MeshStandardMaterial, EmissiveCache> = new Map();
+  private highlightActive: boolean = false;
+
+  // One-shot optimal-zone entry pulse.
+  private pulseTimer: number = -1;
+  private pulseDuration: number = 0.22;
 
   constructor(scene: THREE.Scene, modelManager?: ModelManager) {
     this.scene = scene;
@@ -378,6 +394,10 @@ export class SmashableManager {
       this.scene.remove(this.currentGroup);
       this.currentGroup = null;
     }
+    // Fresh object → drop any cached emissive state from the previous one.
+    this.emissiveCache.clear();
+    this.highlightActive = false;
+    this.pulseTimer = -1;
 
     // Check registry for a GLB model
     const entry = MODEL_REGISTRY[def.id];
@@ -477,7 +497,65 @@ export class SmashableManager {
       this.scene.remove(group);
       this.currentGroup = null;
     }
+    this.emissiveCache.clear();
+    this.highlightActive = false;
+    this.pulseTimer = -1;
     return group;
+  }
+
+  /**
+   * Drive the charge glow on the current object.
+   * @param level  0..1 charge amount (0 clears the glow)
+   * @param danger true when past danger threshold — switches tint to amber
+   * @param tierColor hex color used outside the danger zone
+   */
+  setChargeHighlight(level: number, danger: boolean, tierColor: number): void {
+    if (!this.currentGroup) return;
+
+    if (level <= 0.001) {
+      if (this.highlightActive) this.restoreEmissive();
+      return;
+    }
+
+    const color = danger ? DANGER_COLOR : tierColor;
+    // Intensity ramps with level so the glow feels earned as the bar fills.
+    // Pulse adds a subtle breath so static holds still feel alive.
+    const pulse = 0.85 + Math.sin(this.elapsedTime * 8) * 0.15;
+    const intensity = level * 0.9 * pulse;
+
+    this.currentGroup.traverse((child) => {
+      const mesh = child as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const std = m as THREE.MeshStandardMaterial;
+        if (!std || !(std.isMaterial) || !('emissive' in std)) continue;
+        if (!this.emissiveCache.has(std)) {
+          this.emissiveCache.set(std, {
+            color: std.emissive.clone(),
+            intensity: std.emissiveIntensity,
+          });
+        }
+        TMP_COLOR.setHex(color);
+        std.emissive.copy(TMP_COLOR);
+        std.emissiveIntensity = intensity;
+      }
+    });
+    this.highlightActive = true;
+  }
+
+  private restoreEmissive(): void {
+    for (const [mat, orig] of this.emissiveCache) {
+      mat.emissive.copy(orig.color);
+      mat.emissiveIntensity = orig.intensity;
+    }
+    this.emissiveCache.clear();
+    this.highlightActive = false;
+  }
+
+  /** Trigger a one-shot scale snap on the current object (e.g. entering optimal zone). */
+  pulseOptimal(): void {
+    this.pulseTimer = 0;
   }
 
   update(dt: number): void {
@@ -507,6 +585,24 @@ export class SmashableManager {
 
       this.currentGroup.position.y = this.baseY + Math.sin(this.elapsedTime * 2) * 0.05;
       this.currentGroup.rotation.y += 0.5 * dt;
+
+      // Optimal-zone entry snap: scale bumps 1.0 → 1.12 → 1.0 over pulseDuration.
+      if (this.pulseTimer >= 0) {
+        this.pulseTimer += dt;
+        const t = Math.min(this.pulseTimer / this.pulseDuration, 1);
+        const bump = t < 0.35
+          ? 1 + (t / 0.35) * 0.12
+          : 1 + (1 - (t - 0.35) / 0.65) * 0.12;
+        this.currentGroup.scale.set(
+          this.targetScale.x * bump,
+          this.targetScale.y * bump,
+          this.targetScale.z * bump,
+        );
+        if (t >= 1) {
+          this.currentGroup.scale.copy(this.targetScale);
+          this.pulseTimer = -1;
+        }
+      }
     }
   }
 }

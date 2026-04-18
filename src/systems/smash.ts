@@ -36,6 +36,16 @@ export class SmashSystem {
   private hammerModelLoaded = false;
   private currentHammerSkinId: string = '';
 
+  private aura: THREE.Mesh;
+  private auraMaterial: THREE.MeshBasicMaterial;
+  private auraTargetColor = new THREE.Color(0xffffff);
+  private auraTargetAlpha = 0;
+  private auraCurrentAlpha = 0;
+  private auraPulsePhase = 0;
+
+  private chargeLevel = 0;
+  private breathePhase = 0;
+
   constructor(
     scene: THREE.Scene,
     store: Store,
@@ -64,9 +74,47 @@ export class SmashSystem {
     this.hammer = this.createHammer();
     this.scene.add(this.hammer);
 
+    // Combo-tier aura: additive-blended sphere sitting at the hammer head,
+    // parented to the hammer group so it follows the swing.
+    const auraGeom = new THREE.SphereGeometry(0.38, 20, 16);
+    this.auraMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.aura = new THREE.Mesh(auraGeom, this.auraMaterial);
+    this.aura.position.y = -CONFIG.hammerLength;
+    this.aura.visible = false;
+    this.hammer.add(this.aura);
+
     // Load initial hammer model and react to skin changes
     this.applyHammerSkin();
     this.store.subscribe(() => this.applyHammerSkin());
+  }
+
+  /** Reposition the aura to the current hammer's head after a skin swap. */
+  private attachAura(): void {
+    if (!this.aura) return;
+    if (this.aura.parent) this.aura.parent.remove(this.aura);
+    // For procedural hammers the head sits at y = -hammerLength. For GLB models
+    // wrapped in an outerGroup, y = -hammerLength * 1.2 roughly matches the head
+    // (models are scaled to hammerLength * 1.2). Either way -hammerLength reads
+    // as "bottom of the hammer," which is visually correct.
+    this.aura.position.set(0, -CONFIG.hammerLength, 0);
+    this.hammer.add(this.aura);
+  }
+
+  /** Set combo tier visuals — color + target alpha for the hammer aura. */
+  setComboTier(color: number, alpha: number): void {
+    this.auraTargetColor.setHex(color);
+    this.auraTargetAlpha = alpha;
+  }
+
+  /** 0..1 charge level drives the idle hammer breathe-scale. */
+  setChargeLevel(level: number): void {
+    this.chargeLevel = Math.max(0, Math.min(1, level));
   }
 
   private applyHammerSkin(): void {
@@ -124,6 +172,8 @@ export class SmashSystem {
     if (head) {
       (head.material as THREE.MeshStandardMaterial).color.setHex(color);
     }
+
+    this.attachAura();
   }
 
   private async loadHammerModel(modelPath: string): Promise<void> {
@@ -174,6 +224,8 @@ export class SmashSystem {
     this.hammer = outerGroup;
     this.hammerModelLoaded = true;
     this.scene.add(this.hammer);
+
+    this.attachAura();
   }
 
   private createHammer(): THREE.Group {
@@ -219,6 +271,20 @@ export class SmashSystem {
   }
 
   update(dt: number): void {
+    // Aura runs every frame (including idle) so tier changes animate smoothly.
+    this.updateAura(dt);
+
+    // Breathe-scale while idle and charging. During swing/return the scale
+    // must be neutral so the rotation animation reads cleanly.
+    if (this.phase === 'idle' && this.chargeLevel > 0) {
+      this.breathePhase += dt * 7;
+      const amp = 0.07 * this.chargeLevel;
+      const s = 1 + Math.sin(this.breathePhase) * amp;
+      this.hammer.scale.setScalar(s);
+    } else if (this.hammer.scale.x !== 1) {
+      this.hammer.scale.setScalar(1);
+    }
+
     if (this.phase === 'idle') return;
 
     this.timer += dt;
@@ -254,6 +320,23 @@ export class SmashSystem {
         this.store.update({ isSmashing: false, canTap: true });
       }
     }
+  }
+
+  private updateAura(dt: number): void {
+    // Smoothly lerp color + alpha toward the target set by setComboTier().
+    this.auraMaterial.color.lerp(this.auraTargetColor, Math.min(1, dt * 6));
+    const alphaLerp = Math.min(1, dt * 4);
+    this.auraCurrentAlpha += (this.auraTargetAlpha - this.auraCurrentAlpha) * alphaLerp;
+
+    // Gentle pulse so the glow feels alive, scaled by current alpha.
+    this.auraPulsePhase += dt * 3.2;
+    const pulse = 0.85 + Math.sin(this.auraPulsePhase) * 0.15;
+    this.auraMaterial.opacity = this.auraCurrentAlpha * pulse;
+    this.aura.visible = this.auraCurrentAlpha > 0.01;
+
+    // Scale in with alpha so tier bumps feel like the aura inflating.
+    const s = 0.7 + this.auraCurrentAlpha * 0.6;
+    this.aura.scale.setScalar(s);
   }
 
   private onImpact(): void {

@@ -34,6 +34,9 @@ import { Overlays } from '../ui/overlays';
 import { DailyUI } from '../ui/daily';
 import { LeaderboardUI } from '../ui/leaderboard';
 import { ChargeBar } from '../ui/chargebar';
+import { ComboRing } from '../ui/combo-ring';
+import { getComboTier, getTierProgress } from './combo-tier';
+import { shouldShake, shouldZoom } from '../systems/motion-prefs';
 import { LoginRewardUI } from '../ui/login-reward';
 import { StarterPackUI } from '../ui/starter-pack';
 import { PressSystem } from '../systems/press';
@@ -84,6 +87,8 @@ export class Game {
   private dailyUI: DailyUI;
   private leaderboardUI: LeaderboardUI;
   private chargeBar: ChargeBar;
+  private comboRing!: ComboRing;
+  private comboSaveAvailable: boolean = true;
   private loginRewardUI: LoginRewardUI;
   private starterPackUI: StarterPackUI;
   private sessionGoalSystem: SessionGoalSystem;
@@ -110,6 +115,7 @@ export class Game {
   private streakIdleTimer: number = 0;
   private readonly streakTimeoutSec: number = 4;
   private lastEarnedCoins: number = 0;
+  private prevChargeLevel: number = 0;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -304,6 +310,7 @@ export class Game {
     );
     this.leaderboardUI = new LeaderboardUI(container, this.store, this.dailyChallenge);
     this.chargeBar = new ChargeBar(container, this.store);
+    this.comboRing = new ComboRing(container);
     this.loginRewardUI = new LoginRewardUI(container, this.store, this.loginRewardSystem, this.audioManager, () => {
       this.overlays.showUnlockCelebration('JACKPOT BOOST');
       this.audioManager.playJackpotSound();
@@ -389,14 +396,16 @@ export class Game {
         this.overlays.showCoinPopup(earned);
 
         // Scale shake intensity with combo level
-        const shakeIntensity = CONFIG.screenShakeIntensity + (combo - 1) * 1.5;
-        this.overlays.screenShake(container, shakeIntensity);
+        if (shouldShake()) {
+          const shakeIntensity = CONFIG.screenShakeIntensity + (combo - 1) * 1.5;
+          this.overlays.screenShake(container, shakeIntensity);
+        }
 
         // Impact flash
         this.overlays.showImpactFlash();
 
         // Camera zoom punch
-        this.triggerZoomPunch();
+        if (shouldZoom()) this.triggerZoomPunch();
 
         // Voice line (handles cooldowns/probability internally)
         this.voiceManager.onSmash(this.lastSmashPower, streak, this.lastSmashRarity, this.lastSmashPack);
@@ -442,7 +451,9 @@ export class Game {
       if (jackpotActive) {
         this.overlays.showJackpotLabel(jackpotMultiplier);
         this.overlays.showImpactFlash('#ffd700');
-        this.overlays.screenShake(container, CONFIG.screenShakeIntensity * 2, 200);
+        if (shouldShake()) {
+          this.overlays.screenShake(container, CONFIG.screenShakeIntensity * 2, 200);
+        }
         this.audioManager.playJackpotSound();
         this.voiceManager.playRewardVoice();
         // Reset jackpot flag
@@ -473,6 +484,11 @@ export class Game {
         }
       }
       this.lastStreak = streak;
+
+      // Combo tier visuals: hammer aura + progress ring follow the current tier.
+      const tier = getComboTier(streak);
+      this.smashSystem.setComboTier(tier.color, tier.glowAlpha);
+      this.comboRing.update(streak, getTierProgress(streak), tier.color, tier.name, tier.ringAlpha);
 
       // Streak heat lighting
       this.updateStreakHeat(streak);
@@ -633,6 +649,14 @@ export class Game {
     this.hapticsSystem.resetChargeBuzz();
 
     if (!result.success) {
+      // First overcharge of the session is forgiven — streak survives.
+      if (this.comboSaveAvailable && this.store.state.streak > 0) {
+        this.comboSaveAvailable = false;
+        this.overlays.showSaved();
+        this.hapticsSystem.notifySuccess();
+        return;
+      }
+
       // Overcharge fail
       this.audioManager.playOverchargeFail();
       this.overlays.showOvercharge();
@@ -946,7 +970,20 @@ export class Game {
     // Charge system uses raw dt (fills at real-time rate)
     if (CONFIG.chargeEnabled) {
       this.chargeSystem.update(rawDt);
-      this.hapticsSystem.updateChargeBuzz(rawDt, this.store.state.chargeLevel);
+      const level = this.store.state.chargeLevel;
+      this.hapticsSystem.updateChargeBuzz(rawDt, level);
+
+      // Push charge feedback into the 3D scene.
+      const inDanger = level > CONFIG.chargeDangerMax;
+      const tier = getComboTier(this.store.state.streak);
+      this.smashableManager.setChargeHighlight(level, inDanger, tier.color);
+      this.smashSystem.setChargeLevel(level);
+
+      // Crossing upward into the optimal zone → one-shot snap on the target.
+      if (level >= CONFIG.chargeOptimalMin && this.prevChargeLevel < CONFIG.chargeOptimalMin) {
+        this.smashableManager.pulseOptimal();
+      }
+      this.prevChargeLevel = level;
     }
 
     // Streak idle timeout: reset combo if no smash for N seconds

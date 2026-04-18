@@ -1,4 +1,5 @@
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { CONFIG } from '../game/config';
 
 export class HapticsSystem {
   private enabled = localStorage.getItem('rage-smash-haptics') !== 'off';
@@ -52,6 +53,8 @@ export class HapticsSystem {
   /**
    * Call each frame while charging. Produces periodic light pulses
    * that increase in frequency as charge fills (ticking time bomb feel).
+   * In the danger zone (> chargeDangerMax) switches to a heavier, slower
+   * heartbeat to make the risk physically legible.
    */
   updateChargeBuzz(dt: number, chargeLevel: number): void {
     if (!this.enabled || chargeLevel <= 0) {
@@ -59,13 +62,15 @@ export class HapticsSystem {
       return;
     }
 
-    // Interval shrinks from 300ms at low charge to 80ms near overcharge
-    const interval = 0.3 - chargeLevel * 0.22;
-    this.chargeBuzzTimer += dt;
+    const inDanger = chargeLevel > CONFIG.chargeDangerMax;
+    // Danger: slower, heavier pulse (heartbeat). Otherwise ticking-buzz ramp.
+    const interval = inDanger ? 0.18 : 0.3 - chargeLevel * 0.22;
+    const style = inDanger ? ImpactStyle.Medium : ImpactStyle.Light;
 
+    this.chargeBuzzTimer += dt;
     if (this.chargeBuzzTimer >= interval) {
       this.chargeBuzzTimer = 0;
-      Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
+      Haptics.impact({ style }).catch(() => {});
     }
   }
 

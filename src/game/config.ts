@@ -98,10 +98,24 @@ export const CONFIG = {
     { threshold: 5,  text: 'x5 COMBO!' },
     { threshold: 10, text: 'DOMINATING!' },
     { threshold: 20, text: 'UNSTOPPABLE!' },
+    { threshold: 30, text: 'LEGENDARY!' },
+    { threshold: 50, text: 'MYTHIC!' },
   ] as { threshold: number; text: string }[],
   comboLabelDuration: 600,
   comboLabelFontSize: 36,
   comboLabelScaleMax: 1.4,
+
+  // --- Combo Tiers (visual identity + progression ring targets) ---
+  // Entries are ordered ascending by threshold. tier(streak) returns the highest match.
+  comboTiers: [
+    { id: 'none',      threshold: 0,  name: '',          color: 0xcccccc, glowAlpha: 0.00, ringAlpha: 0.00 },
+    { id: 'bronze',    threshold: 1,  name: 'BRONZE',    color: 0xcd7f32, glowAlpha: 0.25, ringAlpha: 0.35 },
+    { id: 'silver',    threshold: 5,  name: 'SILVER',    color: 0xc0c0c0, glowAlpha: 0.40, ringAlpha: 0.45 },
+    { id: 'gold',      threshold: 10, name: 'GOLD',      color: 0xffd700, glowAlpha: 0.55, ringAlpha: 0.55 },
+    { id: 'platinum',  threshold: 20, name: 'PLATINUM',  color: 0x80c8ff, glowAlpha: 0.70, ringAlpha: 0.65 },
+    { id: 'legendary', threshold: 30, name: 'LEGENDARY', color: 0xff4499, glowAlpha: 0.85, ringAlpha: 0.75 },
+    { id: 'mythic',    threshold: 50, name: 'MYTHIC',    color: 0x9933ff, glowAlpha: 1.00, ringAlpha: 0.85 },
+  ] as { id: string; threshold: number; name: string; color: number; glowAlpha: number; ringAlpha: number }[],
 
   // --- Phase 3: Charge Bar ---
   chargeEnabled: true,
@@ -153,10 +167,13 @@ export const CONFIG = {
 
   // --- Combo Percentage Bonuses ---
   comboBonuses: [
-    { threshold: 2, bonus: 0.10 },
-    { threshold: 3, bonus: 0.20 },
-    { threshold: 5, bonus: 0.40 },
+    { threshold: 2,  bonus: 0.10 },
+    { threshold: 3,  bonus: 0.20 },
+    { threshold: 5,  bonus: 0.40 },
     { threshold: 10, bonus: 0.75 },
+    { threshold: 20, bonus: 1.00 },
+    { threshold: 30, bonus: 1.50 },
+    { threshold: 50, bonus: 2.00 },
   ] as { threshold: number; bonus: number }[],
 
   // --- Streak Bonus ---
