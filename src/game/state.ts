@@ -100,6 +100,8 @@ export interface GameState {
   adsRemoved: boolean;
   // Collection: object ids the player has smashed at least once
   seenObjects: string[];
+  // Achievements: ids of milestones the player has unlocked
+  unlockedAchievements: string[];
 }
 
 export function createInitialState(): GameState {
@@ -140,6 +142,7 @@ export function createInitialState(): GameState {
     smashesSincePress: 0,
     adsRemoved: false,
     seenObjects: [],
+    unlockedAchievements: [],
   };
 }
 

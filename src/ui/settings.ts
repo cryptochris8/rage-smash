@@ -7,6 +7,7 @@ import {
   setScreenShakeEnabled,
 } from '../systems/motion-prefs';
 import { OBJECTS } from '../content/objects';
+import { ACHIEVEMENTS } from '../systems/achievements';
 
 export class SettingsUI {
   private container: HTMLElement;
@@ -18,6 +19,7 @@ export class SettingsUI {
   private onRestore: () => Promise<string[]>;
   private onReset: () => void;
   private onOpenCollection: () => void;
+  private onOpenAchievements: () => void;
 
   constructor(
     container: HTMLElement,
@@ -28,6 +30,7 @@ export class SettingsUI {
     onRestore?: () => Promise<string[]>,
     onReset?: () => void,
     onOpenCollection?: () => void,
+    onOpenAchievements?: () => void,
   ) {
     this.container = container;
     this.store = store;
@@ -37,6 +40,7 @@ export class SettingsUI {
     this.onRestore = onRestore ?? (async () => []);
     this.onReset = onReset ?? (() => {});
     this.onOpenCollection = onOpenCollection ?? (() => {});
+    this.onOpenAchievements = onOpenAchievements ?? (() => {});
   }
 
   show(): void {
@@ -226,6 +230,12 @@ export class SettingsUI {
     const percent = totalObjects === 0 ? 0 : Math.round((seenCount / totalObjects) * 100);
     panel.appendChild(this.createCollectionButton(seenCount, totalObjects, percent));
 
+    // Achievements entry point.
+    const achCount = this.store.state.unlockedAchievements.length;
+    const achTotal = ACHIEVEMENTS.length;
+    const achPercent = achTotal === 0 ? 0 : Math.round((achCount / achTotal) * 100);
+    panel.appendChild(this.createAchievementsButton(achCount, achTotal, achPercent));
+
     panel.appendChild(this.createStatRow('Sessions', stats.totalSessions.toLocaleString()));
     panel.appendChild(this.createStatRow('Total Smashes', stats.totalSmashes.toLocaleString()));
     panel.appendChild(this.createStatRow('Coins Earned', stats.totalCoinsEarned.toLocaleString()));
@@ -382,6 +392,50 @@ export class SettingsUI {
     row.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this.onOpenCollection();
+    });
+    return row;
+  }
+
+  private createAchievementsButton(unlocked: number, total: number, percent: number): HTMLDivElement {
+    const row = document.createElement('div');
+    Object.assign(row.style, {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      background: 'rgba(255,215,0,0.10)',
+      border: '1px solid rgba(255,215,0,0.32)',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      WebkitTapHighlightColor: 'transparent',
+      marginBottom: '4px',
+    });
+
+    const left = document.createElement('div');
+    const lbl = document.createElement('div');
+    lbl.textContent = 'Achievements';
+    Object.assign(lbl.style, { fontSize: '15px', color: '#ffffff', fontWeight: '700' });
+    const sub = document.createElement('div');
+    sub.textContent = `${unlocked} / ${total} unlocked`;
+    Object.assign(sub.style, { fontSize: '12px', color: 'rgba(255,255,255,0.55)', marginTop: '2px' });
+    left.appendChild(lbl);
+    left.appendChild(sub);
+
+    const right = document.createElement('div');
+    right.textContent = `${percent}% \u203A`;
+    Object.assign(right.style, {
+      fontSize: '14px',
+      fontWeight: '800',
+      color: '#ffd700',
+      letterSpacing: '1px',
+    });
+
+    row.appendChild(left);
+    row.appendChild(right);
+    row.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      this.onOpenAchievements();
     });
     return row;
   }

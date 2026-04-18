@@ -24,6 +24,7 @@ interface SaveData {
   jackpotBoostExpiresAt: number;
   adsRemoved: boolean;
   seenObjects: string[];
+  unlockedAchievements: string[];
 }
 
 export class SaveSystem {
@@ -71,6 +72,7 @@ export class SaveSystem {
       if (typeof data.jackpotBoostExpiresAt === 'number') updates.jackpotBoostExpiresAt = data.jackpotBoostExpiresAt;
       if (typeof data.adsRemoved === 'boolean') updates.adsRemoved = data.adsRemoved;
       if (Array.isArray(data.seenObjects)) updates.seenObjects = data.seenObjects;
+      if (Array.isArray(data.unlockedAchievements)) updates.unlockedAchievements = data.unlockedAchievements;
 
       if (Object.keys(updates).length > 0) {
         this.store.update(updates);
@@ -104,6 +106,7 @@ export class SaveSystem {
         jackpotBoostExpiresAt: state.jackpotBoostExpiresAt,
         adsRemoved: state.adsRemoved,
         seenObjects: state.seenObjects,
+        unlockedAchievements: state.unlockedAchievements,
       };
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     } catch {

@@ -50,6 +50,8 @@ import { GoalsPanel } from '../ui/goals-panel';
 import { ProgressPrompt } from '../ui/progress-prompt';
 import { SettingsUI } from '../ui/settings';
 import { CollectionUI } from '../ui/collection';
+import { AchievementsUI } from '../ui/achievements';
+import { checkAchievements, getAchievement } from '../systems/achievements';
 import { Tutorial } from '../ui/tutorial';
 import { GameAnalytics } from '../systems/analytics';
 import { OBJECTS } from '../content/objects';
@@ -101,6 +103,7 @@ export class Game {
   private pressHUD: PressHUD;
   private settingsUI: SettingsUI;
   private collectionUI!: CollectionUI;
+  private achievementsUI!: AchievementsUI;
   private analytics: GameAnalytics;
   private storeKit: StoreKitManager;
   private nextIsPress: boolean = false;
@@ -383,9 +386,14 @@ export class Game {
       // Collection opener — hide settings first so the modal can sit on top cleanly.
       this.settingsUI.hide();
       this.collectionUI.show();
+    }, () => {
+      // Achievements opener
+      this.settingsUI.hide();
+      this.achievementsUI.show();
     });
 
     this.collectionUI = new CollectionUI(container, this.store);
+    this.achievementsUI = new AchievementsUI(container, this.store);
 
     // Initial goals panel update
     this.updateGoalsPanel();
@@ -509,6 +517,10 @@ export class Game {
         this.overlays.showNewBest();
       }
       this.lastBestCombo = bestCombo;
+
+      // Achievements: check and unlock. The Store's isNotifying guard keeps the
+      // follow-up update from re-entering this subscribe synchronously.
+      this.checkAndAwardAchievements();
     });
 
     // Update gift notification
@@ -820,6 +832,37 @@ export class Game {
   }
 
   private tmpHeatColor = new THREE.Color();
+
+  private checkAndAwardAchievements(): void {
+    const newly = checkAchievements(this.store.state);
+    if (newly.length === 0) return;
+
+    let coinsGained = 0;
+    for (const id of newly) {
+      const def = getAchievement(id);
+      if (!def) continue;
+      coinsGained += def.reward;
+    }
+
+    const updatedUnlocked = [...this.store.state.unlockedAchievements, ...newly];
+    this.store.update({
+      unlockedAchievements: updatedUnlocked,
+      coins: this.store.state.coins + coinsGained,
+    });
+
+    // Celebrate one at a time so each unlock reads clearly.
+    for (let i = 0; i < newly.length; i++) {
+      const def = getAchievement(newly[i]);
+      if (!def) continue;
+      const delay = i * 1300;
+      setTimeout(() => {
+        this.overlays.showUnlockCelebration(`${def.icon} ${def.name}`);
+        this.particleSystem.emitConfetti();
+        this.audioManager.playJackpotSound();
+        this.hapticsSystem.notifySuccess();
+      }, delay);
+    }
+  }
 
   // --- 2X Boost ---
 
