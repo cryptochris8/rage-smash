@@ -51,6 +51,7 @@ import { ProgressPrompt } from '../ui/progress-prompt';
 import { SettingsUI } from '../ui/settings';
 import { CollectionUI } from '../ui/collection';
 import { AchievementsUI } from '../ui/achievements';
+import { showLandscapeHintIfNeeded } from '../ui/landscape-hint';
 import { checkAchievements, getAchievement } from '../systems/achievements';
 import { Tutorial } from '../ui/tutorial';
 import { GameAnalytics } from '../systems/analytics';
@@ -563,6 +564,9 @@ export class Game {
     // Spawn first object and start loop
     this.spawnSystem.spawnNext();
     this.animate();
+
+    // One-shot landscape nudge — only if touch-device + currently portrait.
+    showLandscapeHintIfNeeded(this.container);
 
     // Initialize native plugins (Capacitor)
     initNative();
