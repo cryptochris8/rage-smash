@@ -2,9 +2,22 @@ import { CONFIG } from '../game/config';
 
 export class Overlays {
   private container: HTMLElement;
+  private activeShake: { cancel: () => void } | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
+  }
+
+  /**
+   * Guarantees a short-lived overlay element is removed even if its RAF
+   * cleanup gets suspended (e.g. tab backgrounded mid-animation). Fires a
+   * setTimeout at the animation's nominal end + 500ms buffer; element.remove()
+   * is idempotent so double-removal from both the RAF and this timeout is safe.
+   */
+  private scheduleCleanup(el: HTMLElement, durationMs: number): void {
+    setTimeout(() => {
+      if (el.parentNode) el.remove();
+    }, durationMs + 500);
   }
 
   /** Creates a floating "+N" text that animates upward and fades out. */
@@ -32,6 +45,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 1000;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -96,6 +110,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 500;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -175,6 +190,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = CONFIG.comboLabelDuration;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -223,6 +239,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = CONFIG.impactFlashDuration;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -241,14 +258,33 @@ export class Overlays {
     requestAnimationFrame(animate);
   }
 
-  /** Applies a quick CSS transform shake with configurable intensity and duration. */
+  /**
+   * Applies a quick CSS transform shake with configurable intensity and duration.
+   * If a shake is already in progress, it's cancelled first (and its transform
+   * restored) so the new shake captures a clean originalTransform — otherwise
+   * concurrent shakes clobber each other's transforms and visually "snap."
+   */
   screenShake(container: HTMLElement, intensity?: number, duration?: number): void {
+    if (this.activeShake) this.activeShake.cancel();
+
     const dur = duration ?? CONFIG.screenShakeDuration;
     const int = intensity ?? CONFIG.screenShakeIntensity;
     const start = performance.now();
     const originalTransform = container.style.transform || '';
 
+    let cancelled = false;
+    const cancel = () => {
+      if (cancelled) return;
+      cancelled = true;
+      container.style.transform = originalTransform;
+      if (this.activeShake && this.activeShake.cancel === cancel) {
+        this.activeShake = null;
+      }
+    };
+    this.activeShake = { cancel };
+
     const shake = (now: number) => {
+      if (cancelled) return;
       const elapsed = now - start;
       const t = Math.min(elapsed / dur, 1);
 
@@ -259,7 +295,7 @@ export class Overlays {
         container.style.transform = `${originalTransform} translate(${dx}px, ${dy}px)`;
         requestAnimationFrame(shake);
       } else {
-        container.style.transform = originalTransform;
+        cancel();
       }
     };
 
@@ -293,6 +329,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 800;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -342,6 +379,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 900;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -405,6 +443,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = CONFIG.jackpotLabelDuration;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -489,6 +528,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 1500;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -560,6 +600,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 900;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {
@@ -636,6 +677,7 @@ export class Overlays {
     this.container.appendChild(el);
 
     const duration = 2000;
+    this.scheduleCleanup(el, duration);
     const start = performance.now();
 
     const animate = (now: number) => {

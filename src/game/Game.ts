@@ -1058,9 +1058,11 @@ export class Game {
       this.prevChargeLevel = level;
     }
 
-    // Streak idle timeout: reset combo if no smash for N seconds
+    // Streak idle timeout: reset combo if no smash for N seconds.
+    // Clamp the per-frame step so a stall spike (tab background, GC pause,
+    // heavy combo FX frame) can't instantly consume the whole timeout window.
     if (this.store.state.streak > 0 && !this.store.state.isSmashing && !this.store.state.isCharging) {
-      this.streakIdleTimer += rawDt;
+      this.streakIdleTimer += Math.min(rawDt, 0.1);
       if (this.streakIdleTimer >= this.streakTimeoutSec) {
         this.store.update({ streak: 0, combo: 1 });
         this.lastStreak = 0;

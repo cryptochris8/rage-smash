@@ -28,9 +28,12 @@ interface SaveData {
   pressUpgrades: { power: number; speed: number; fragments: number };
 }
 
+const SAVE_DEBOUNCE_MS = 200;
+
 export class SaveSystem {
   private store: Store;
   private unsubscribe: (() => void) | null = null;
+  private pendingSave: number | null = null;
 
   constructor(store: Store) {
     this.store = store;
@@ -127,8 +130,12 @@ export class SaveSystem {
   autoSave(): void {
     if (this.unsubscribe) return;
     this.unsubscribe = this.store.subscribe(() => {
-      this.save();
+      this.scheduleSave();
     });
+    // Flush any pending save before the tab backgrounds / app closes so we
+    // don't lose a smash-in-progress if iOS freezes the page.
+    document.addEventListener('visibilitychange', this.flushOnHide);
+    window.addEventListener('pagehide', this.flushOnHide);
   }
 
   /** Stop auto-saving (used before reset to prevent re-saving cleared data) */
@@ -137,5 +144,33 @@ export class SaveSystem {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+    if (this.pendingSave !== null) {
+      clearTimeout(this.pendingSave);
+      this.pendingSave = null;
+    }
+    document.removeEventListener('visibilitychange', this.flushOnHide);
+    window.removeEventListener('pagehide', this.flushOnHide);
+  }
+
+  private flushOnHide = (): void => {
+    if (this.pendingSave !== null) {
+      clearTimeout(this.pendingSave);
+      this.pendingSave = null;
+      this.save();
+    }
+  };
+
+  /**
+   * Coalesce rapid-fire store updates into one localStorage.setItem per
+   * SAVE_DEBOUNCE_MS. During a high-combo run a single smash can trigger
+   * 3-5 store updates; without this, we'd hit localStorage 10+ times/sec
+   * on iOS — a known cause of main-thread stalls.
+   */
+  private scheduleSave(): void {
+    if (this.pendingSave !== null) return;
+    this.pendingSave = window.setTimeout(() => {
+      this.pendingSave = null;
+      this.save();
+    }, SAVE_DEBOUNCE_MS);
   }
 }
