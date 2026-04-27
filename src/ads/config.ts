@@ -43,6 +43,7 @@ export const INTERSTITIAL_GATING: InterstitialGating = {
   minRoundsSinceLast: 10,
   firstSessionProtected: true,
   minSessionLengthSec: 120,
+  minGlobalGapMs: 60_000,
 };
 
 const TEST_IDS = {
@@ -93,18 +94,29 @@ function hasPlaceholder(id: string): boolean {
   return id.includes('XXXXX');
 }
 
+/**
+ * Verify ad IDs at runtime. Throws in production builds when placeholders are
+ * detected so a misconfigured release fails loudly instead of silently sending
+ * traffic to the wrong (or invalid) ad units. In dev builds, only warns.
+ *
+ * Caller (AdMobProvider.initialize) should wrap in try/catch and fall back to
+ * the StubProvider so the game still starts on a misconfigured release.
+ */
 export function validateAdIds(platform: 'ios' | 'android'): void {
-  if (!AD_PRODUCTION) return;
   const ids = ADMOB_IDS[platform];
   const appId = ADMOB_APP_IDS[platform];
   const warnings: string[] = [];
   if (hasPlaceholder(ids.rewarded)) warnings.push(`${platform} rewarded ad ID`);
   if (hasPlaceholder(ids.interstitial)) warnings.push(`${platform} interstitial ad ID`);
   if (hasPlaceholder(appId)) warnings.push(`${platform} AdMob app ID`);
-  if (warnings.length > 0) {
-    console.error(
-      `[AdMob] PRODUCTION BUILD with placeholder IDs! Replace: ${warnings.join(', ')}. ` +
-      `Set VITE_ADMOB_* env vars in .env.production or update src/ads/config.ts.`
-    );
+  if (warnings.length === 0) return;
+
+  const message =
+    `[AdMob] Placeholder IDs detected: ${warnings.join(', ')}. ` +
+    `Set VITE_ADMOB_* env vars in .env.production or pass them via CI.`;
+
+  if (AD_PRODUCTION) {
+    throw new Error(message);
   }
+  console.warn(message);
 }

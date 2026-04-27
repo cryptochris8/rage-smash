@@ -33,7 +33,10 @@ export class Shop {
   private roomsSection: HTMLDivElement;
   private skinsSection: HTMLDivElement;
   private footerCoins: HTMLSpanElement;
-  private unsubscribe: () => void;
+  // Subscription is owned by show()/hide() — null while shop is closed so
+  // we don't accumulate listeners or do redundant rebuild work in the
+  // background.
+  private unsubscribe: (() => void) | null = null;
   private visible = false;
   private onRoomSelect: ((roomId: string) => void) | null = null;
   private onUpgradePurchase: (() => void) | null = null;
@@ -238,18 +241,17 @@ export class Shop {
 
     // Mount
     this.container.appendChild(this.root);
-
-    // Subscribe for reactive updates while shop is open
-    this.unsubscribe = this.store.subscribe(() => {
-      if (this.visible) {
-        this.rebuild();
-      }
-    });
   }
 
   show(): void {
+    if (this.visible) return;
     this.visible = true;
     this.store.update({ shopOpen: true });
+    // Subscribe for live updates while shop is visible. Unsubscribed in hide()
+    // so we don't burn listener slots on every modal toggle.
+    this.unsubscribe = this.store.subscribe(() => {
+      if (this.visible) this.rebuild();
+    }, 'Shop');
     this.rebuild();
     this.root.style.display = 'block';
     // Force reflow so opacity transition fires
@@ -258,8 +260,13 @@ export class Shop {
   }
 
   hide(): void {
+    if (!this.visible) return;
     this.visible = false;
     this.store.update({ shopOpen: false });
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
     this.root.style.opacity = '0';
     const onEnd = () => {
       if (!this.visible) {
@@ -271,7 +278,10 @@ export class Shop {
   }
 
   dispose(): void {
-    this.unsubscribe();
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
     this.root.remove();
   }
 

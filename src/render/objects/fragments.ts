@@ -11,7 +11,8 @@ interface Fragment {
   rotSpeed: THREE.Vector3;
   lifetime: number;
   age: number;
-  bounced: boolean;
+  bounceCount: number;
+  atRest: boolean;
   initialScale: number;
   baseSize: number;
   shape: FragmentShapeType;
@@ -93,7 +94,8 @@ export class FragmentManager {
       rotSpeed: new THREE.Vector3(),
       lifetime: CONFIG.fragmentLifetime,
       age: 0,
-      bounced: false,
+      bounceCount: 0,
+      atRest: false,
       initialScale: 1,
       baseSize: 1,
       shape,
@@ -105,15 +107,19 @@ export class FragmentManager {
     this.poolFor(f.shape).push(f);
   }
 
-  /** Evict oldest-ish active fragment when at maxFragments cap (O(1)). */
+  /** Evict oldest-ish active fragment when at maxFragments cap (O(1) amortized).
+   *  Prefer an at-rest victim from the first few slots since resting fragments
+   *  are visually static and least interesting to drop. */
   private evictOne(): void {
     if (this.active.length === 0) return;
-    // swap-and-pop from index 0 — caveat: swap-and-pop doesn't preserve insertion
-    // order, so this isn't strictly the oldest, but it's a constant-time eviction
-    // of some active fragment and is visually indistinguishable at this scale.
-    const victim = this.active[0];
+    let victimIdx = 0;
+    const scan = Math.min(4, this.active.length);
+    for (let i = 0; i < scan; i++) {
+      if (this.active[i].atRest) { victimIdx = i; break; }
+    }
+    const victim = this.active[victimIdx];
     const last = this.active.length - 1;
-    if (last !== 0) this.active[0] = this.active[last];
+    if (last !== victimIdx) this.active[victimIdx] = this.active[last];
     this.active.pop();
     this.release(victim);
   }
@@ -172,7 +178,8 @@ export class FragmentManager {
 
       f.lifetime = CONFIG.fragmentLifetime;
       f.age = 0;
-      f.bounced = false;
+      f.bounceCount = 0;
+      f.atRest = false;
       f.initialScale = 1;
 
       this.active.push(f);
@@ -228,7 +235,8 @@ export class FragmentManager {
 
       f.lifetime = CONFIG.fragmentLifetime;
       f.age = 0;
-      f.bounced = false;
+      f.bounceCount = 0;
+      f.atRest = false;
       f.initialScale = 1;
 
       this.active.push(f);
@@ -236,6 +244,14 @@ export class FragmentManager {
   }
 
   update(dt: number): void {
+    const restY = CONFIG.fragmentRestY;
+    const restitution = CONFIG.fragmentRestitution;
+    const friction = CONFIG.fragmentFriction;
+    const angDamping = CONFIG.fragmentAngularDamping;
+    const restVSq = CONFIG.fragmentRestVelocitySq;
+    const maxBounces = CONFIG.fragmentMaxBounces;
+    const slideDamping = CONFIG.fragmentSlideDamping;
+
     for (let i = this.active.length - 1; i >= 0; i--) {
       const f = this.active[i];
       f.age += dt;
@@ -248,23 +264,53 @@ export class FragmentManager {
         continue;
       }
 
-      f.velocity.y += CONFIG.fragmentGravity * dt;
+      if (!f.atRest) {
+        f.velocity.y += CONFIG.fragmentGravity * dt;
 
-      f.mesh.position.x += f.velocity.x * dt;
-      f.mesh.position.y += f.velocity.y * dt;
-      f.mesh.position.z += f.velocity.z * dt;
+        f.mesh.position.x += f.velocity.x * dt;
+        f.mesh.position.y += f.velocity.y * dt;
+        f.mesh.position.z += f.velocity.z * dt;
 
-      if (f.mesh.position.y < 0.1 && !f.bounced) {
-        f.bounced = true;
-        f.mesh.position.y = 0.1;
-        f.velocity.y = -f.velocity.y * 0.4;
-        f.velocity.x *= 0.5;
-        f.velocity.z *= 0.5;
+        // Multi-bounce until exhausted or capped, then snap to rest.
+        if (f.mesh.position.y < restY && f.velocity.y < 0) {
+          f.mesh.position.y = restY;
+
+          if (f.bounceCount >= maxBounces) {
+            // Bounce budget spent — snap to rest immediately.
+            f.velocity.set(0, 0, 0);
+            f.rotSpeed.set(0, 0, 0);
+            f.atRest = true;
+          } else {
+            f.bounceCount++;
+            f.velocity.y = -f.velocity.y * restitution;
+            f.velocity.x *= friction;
+            f.velocity.z *= friction;
+            f.rotSpeed.multiplyScalar(angDamping);
+
+            // If post-bounce energy is below threshold, settle now instead of
+            // a tiny visual hop that reads as jitter.
+            const vSq = f.velocity.lengthSq();
+            if (vSq < restVSq) {
+              f.velocity.set(0, 0, 0);
+              f.rotSpeed.set(0, 0, 0);
+              f.atRest = true;
+            }
+          }
+        } else if (f.mesh.position.y <= restY + 0.001 && f.velocity.lengthSq() < restVSq) {
+          // Skidding along the ground at low energy — just stop.
+          f.velocity.set(0, 0, 0);
+          f.rotSpeed.set(0, 0, 0);
+          f.atRest = true;
+        } else if (f.mesh.position.y <= restY + 0.001) {
+          // Sliding on the ground but still has lateral energy — friction it down.
+          f.velocity.x *= slideDamping;
+          f.velocity.z *= slideDamping;
+        }
+
+        f.mesh.rotation.x += f.rotSpeed.x * dt;
+        f.mesh.rotation.y += f.rotSpeed.y * dt;
+        f.mesh.rotation.z += f.rotSpeed.z * dt;
       }
-
-      f.mesh.rotation.x += f.rotSpeed.x * dt;
-      f.mesh.rotation.y += f.rotSpeed.y * dt;
-      f.mesh.rotation.z += f.rotSpeed.z * dt;
 
       const progress = f.age / f.lifetime;
       f.material.opacity = 1 - progress;

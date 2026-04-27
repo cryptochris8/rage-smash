@@ -91,7 +91,10 @@ export interface GameState {
   // Retention tracking
   totalPerfectHits: number;
   dailyStreak: number;
-  jackpotBoostExpiresAt: number;
+  /** Granted only by claiming the day-7 login reward (1 hour, 2× coin
+   *  multiplier applied in smash.ts and press.ts). NOT written by
+   *  JackpotSystem — that's a separate per-smash roll. */
+  loginDay7BoostExpiresAt: number;
   // Press bonus
   pressActive: boolean;
   pressProgress: number;
@@ -138,7 +141,7 @@ export function createInitialState(): GameState {
     multiplierLevel: 0,
     totalPerfectHits: 0,
     dailyStreak: 0,
-    jackpotBoostExpiresAt: 0,
+    loginDay7BoostExpiresAt: 0,
     pressActive: false,
     pressProgress: 0,
     smashesSincePress: 0,
@@ -154,6 +157,7 @@ type Listener = () => void;
 export class Store {
   state: GameState;
   private listeners: Set<Listener> = new Set();
+  private listenerLabels: WeakMap<Listener, string> = new WeakMap();
   private isNotifying: boolean = false;
 
   constructor(initial: GameState) {
@@ -168,14 +172,31 @@ export class Store {
     this.notify();
   }
 
-  subscribe(fn: Listener): () => void {
+  subscribe(fn: Listener, label?: string): () => void {
     this.listeners.add(fn);
+    if (label) this.listenerLabels.set(fn, label);
     return () => this.listeners.delete(fn);
+  }
+
+  /** Number of currently-registered subscribers. Used by a dev-mode probe
+   *  to surface listener leaks across long sessions. */
+  getListenerCount(): number {
+    return this.listeners.size;
   }
 
   private notify() {
     this.isNotifying = true;
-    this.listeners.forEach(fn => fn());
+    // Snapshot the listener set so an unsubscribe inside a listener doesn't skip siblings.
+    const snapshot = Array.from(this.listeners);
+    for (const fn of snapshot) {
+      try {
+        fn();
+      } catch (err) {
+        // One throwing subscriber must not silence the rest.
+        const label = this.listenerLabels.get(fn) ?? 'anonymous';
+        console.warn(`[store] subscriber "${label}" threw:`, err);
+      }
+    }
     this.isNotifying = false;
   }
 }

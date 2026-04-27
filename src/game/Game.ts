@@ -10,7 +10,7 @@ import { SmashableManager } from '../render/objects/smashable';
 import { FragmentManager } from '../render/objects/fragments';
 import { ModelManager } from '../render/ModelManager';
 import { getPreloadPaths } from '../content/model-registry';
-import { getHammerModelPaths } from '../content/skins';
+import { getHammerModelPaths, HAMMER_SKINS } from '../content/skins';
 import { InputSystem } from '../systems/input';
 import { SmashSystem } from '../systems/smash';
 import { ParticleSystem } from '../systems/particles';
@@ -23,11 +23,13 @@ import { AdPrompts } from '../ui/ad-prompts';
 import { DailyChallenge } from '../systems/daily';
 import { initNative } from '../systems/native';
 import { TimeScaleSystem } from '../systems/timescale';
+import { PerfMonitor } from '../systems/perf-monitor';
 import { ChargeSystem } from '../systems/charge';
 import { LoginRewardSystem } from '../systems/login-reward';
 import { JackpotSystem } from '../systems/jackpot';
 import { StarterPackSystem } from '../systems/starter-pack';
 import { SmartBoostSystem } from '../systems/smart-boost';
+import { promptThrottle } from '../systems/prompt-throttle';
 import { HUD } from '../ui/hud';
 import { Shop } from '../ui/shop';
 import { Overlays } from '../ui/overlays';
@@ -78,6 +80,7 @@ export class Game {
   private adPrompts!: AdPrompts;
   private dailyChallenge: DailyChallenge;
   private timeScaleSystem: TimeScaleSystem;
+  private perfMonitor: PerfMonitor = new PerfMonitor();
   private chargeSystem: ChargeSystem;
   private loginRewardSystem: LoginRewardSystem;
   private jackpotSystem: JackpotSystem;
@@ -92,7 +95,8 @@ export class Game {
   private leaderboardUI: LeaderboardUI;
   private chargeBar: ChargeBar;
   private comboRing!: ComboRing;
-  private comboSaveAvailable: boolean = true;
+  private comboSavesAvailable: number = CONFIG.comboSaveStartingBank;
+  private lastComboTierIdx: number = 0;
   private loginRewardUI: LoginRewardUI;
   private starterPackUI: StarterPackUI;
   private sessionGoalSystem: SessionGoalSystem;
@@ -118,8 +122,13 @@ export class Game {
   private lastSmashRarity: string = 'common';
   private lastSmashPack: string = 'everyday';
   private lastBestCombo: number = 1;
-  private streakIdleTimer: number = 0;
-  private readonly streakTimeoutSec: number = 4;
+  // Wall-clock streak idle. 0 = idle clock paused (player just smashed, or
+  // is actively charging/smashing). Otherwise: Date.now() of when the idle
+  // window started. Using wall-clock instead of accumulated dt means a
+  // backgrounded tab cannot silently keep the streak alive — when the tab
+  // returns the elapsed time is fully accounted for.
+  private streakIdleStartedAt: number = 0;
+  private readonly streakTimeoutMs: number = 4000;
   private lastEarnedCoins: number = 0;
   private prevChargeLevel: number = 0;
 
@@ -180,6 +189,14 @@ export class Game {
 
     // 3D model manager — preload registered GLB assets
     this.modelManager = new ModelManager();
+    // Protect the currently-equipped hammer from LRU eviction.
+    this.modelManager.setActivePathsProvider(() => {
+      const active = new Set<string>();
+      const skinId = this.store.state.selectedHammer;
+      const skin = HAMMER_SKINS.find((s) => s.id === skinId);
+      if (skin?.model) active.add(skin.model);
+      return active;
+    });
     this.modelManager.preload([...getPreloadPaths(), ...getHammerModelPaths()]).catch((err) =>
       console.warn('[Game] Model preload error:', err),
     );
@@ -200,6 +217,15 @@ export class Game {
     this.adManager.setAudioManager(this.audioManager);
     this.adManager.init().catch((err) => console.warn('[Game] Ad init error:', err));
 
+    // Single fan-out for rewarded-ad watches. Replaces per-call-site
+    // recordAdWatch calls — adding a new system that depends on ad watches
+    // now means subscribing here, not editing every show-ad call site.
+    this.adManager.onRewardEarned(() => {
+      this.retentionChallengeSystem.recordAdWatch();
+      this.analytics.recordAdWatched();
+      this.updateGoalsPanel();
+    });
+
     // Daily challenge
     this.dailyChallenge = new DailyChallenge();
 
@@ -210,7 +236,7 @@ export class Game {
     // Sync streak state from login system into store
     this.store.update({
       dailyStreak: this.loginRewardSystem.getStreak(),
-      jackpotBoostExpiresAt: this.loginRewardSystem.getJackpotBoostExpiresAt(),
+      loginDay7BoostExpiresAt: this.loginRewardSystem.getLoginDay7BoostExpiresAt(),
     });
     this.jackpotSystem = new JackpotSystem();
     this.starterPackSystem = new StarterPackSystem(this.store);
@@ -292,6 +318,8 @@ export class Game {
       this.overlays.showUnlockCelebration(itemName);
       this.audioManager.playJackpotSound();
     }, (needed, upgradeName) => {
+      if (!promptThrottle.canShow('upgradeRescue')) return;
+      promptThrottle.markShown('upgradeRescue');
       this.adPrompts.showUpgradeRescue(needed, upgradeName);
     }, this.storeKit, async () => {
       // Remove Ads IAP (from shop)
@@ -324,9 +352,13 @@ export class Game {
       this.overlays.showUnlockCelebration('JACKPOT BOOST');
       this.audioManager.playJackpotSound();
     }, (coins) => {
-      if (this.adManager.canShowRewarded('daily_bonus_optional')) {
-        setTimeout(() => this.adPrompts.showDailyBonusDouble(coins), 500);
-      }
+      if (!this.adManager.canShowRewarded('daily_bonus_optional')) return;
+      setTimeout(() => {
+        if (promptThrottle.canShow('dailyDouble')) {
+          promptThrottle.markShown('dailyDouble');
+          this.adPrompts.showDailyBonusDouble(coins);
+        }
+      }, 500);
     });
     this.starterPackUI = new StarterPackUI(container, this.store, this.starterPackSystem, this.audioManager, this.storeKit);
     this.goalsPanel = new GoalsPanel(
@@ -405,7 +437,7 @@ export class Game {
 
       // Coin popup + screen shake + flash + zoom punch on earn
       if (coins > this.prevCoins) {
-        this.streakIdleTimer = 0;
+        this.streakIdleStartedAt = 0;
         const earned = coins - this.prevCoins;
         this.lastEarnedCoins = earned;
         this.adManager.trackCoinsEarned(earned);
@@ -431,8 +463,10 @@ export class Game {
         this.voiceManager.onSmash(this.lastSmashPower, streak, this.lastSmashRarity, this.lastSmashPack);
         this.musicManager.duck(500);
 
-        // Smart boost suggestion
-        if (this.smartBoostSystem.checkTrigger(earned)) {
+        // Smart boost suggestion — gated by the global prompt throttle so it
+        // can't stack with starter-pack / session-end / daily-double.
+        if (this.smartBoostSystem.checkTrigger(earned) && promptThrottle.canShow('smartBoost')) {
+          promptThrottle.markShown('smartBoost');
           this.overlays.showBoostSuggestion(() => this.onBoostTap());
         }
 
@@ -479,10 +513,16 @@ export class Game {
         // Reset jackpot flag
         this.store.update({ jackpotActive: false });
 
-        // Offer jackpot double ad after a brief delay for effects to land
+        // Offer jackpot double ad after a brief delay for effects to land.
+        // Throttle re-checks at fire-time so a delay doesn't bypass the gap.
         const jackpotCoins = coins - this.prevCoins;
         if (jackpotCoins > 0 && this.adManager.canShowRewarded('jackpot_bonus')) {
-          setTimeout(() => this.adPrompts.showJackpotBonus(jackpotCoins), 1200);
+          setTimeout(() => {
+            if (promptThrottle.canShow('jackpotDouble')) {
+              promptThrottle.markShown('jackpotDouble');
+              this.adPrompts.showJackpotBonus(jackpotCoins);
+            }
+          }, 1200);
         }
       }
 
@@ -509,6 +549,16 @@ export class Game {
       const tier = getComboTier(streak);
       this.smashSystem.setComboTier(tier.color, tier.glowAlpha);
       this.comboRing.update(streak, getTierProgress(streak), tier.color, tier.name, tier.ringAlpha);
+
+      // Bank a combo save on tier-up (capped). Refills the mercy bank as the
+      // player demonstrates skill — encourages climbing past the prior cliff.
+      const tierIdx = CONFIG.comboTiers.findIndex(t => t.id === tier.id);
+      if (tierIdx > this.lastComboTierIdx && tierIdx > 0) {
+        if (this.comboSavesAvailable < CONFIG.comboSaveMax) {
+          this.comboSavesAvailable++;
+        }
+      }
+      this.lastComboTierIdx = tierIdx;
 
       // Streak heat lighting
       this.updateStreakHeat(streak);
@@ -549,15 +599,30 @@ export class Game {
       this.audioManager.resume();
     });
 
-    // Save session on page unload
-    window.addEventListener('beforeunload', () => this.analytics.endSession());
+    // Session lifecycle hooks. Three-way coverage so a session always ends
+    // cleanly regardless of which event the platform fires first:
+    //   - visibilitychange + hidden: fires on tab switch, mobile background
+    //   - pagehide: fires on iOS WKWebView when visibilitychange is unreliable
+    //   - beforeunload: fires on desktop tab close
+    // analytics.endSession() is idempotent so back-to-back fires only count once.
+    // (SaveSystem owns its own visibilitychange + pagehide listeners for
+    // save flushing — don't duplicate here.)
+    const onAppHidden = () => this.analytics.endSession();
+    const onAppVisible = () => {
+      // New session window after resume so a 6-hour background doesn't
+      // report a 6-hour "session length".
+      this.analytics.startNewSession();
+      this.audioManager.resume();
+      this.musicManager.resume();
+    };
+
+    window.addEventListener('beforeunload', onAppHidden);
+    window.addEventListener('pagehide', onAppHidden);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        this.analytics.endSession();
+        onAppHidden();
       } else if (document.visibilityState === 'visible') {
-        // Resume audio after returning from ad or background
-        this.audioManager.resume();
-        this.musicManager.resume();
+        onAppVisible();
       }
     });
 
@@ -576,9 +641,16 @@ export class Game {
       setTimeout(() => this.showLoginRewards(), 300);
     }
 
-    // Auto-show starter pack after session threshold
+    // Auto-show starter pack after session threshold. Throttle re-checks at
+    // show-time (not now) so a delayed show still respects any prompt that
+    // fired in the meantime.
     if (this.starterPackSystem.shouldShow()) {
-      setTimeout(() => this.starterPackUI.show(), 800);
+      setTimeout(() => {
+        if (promptThrottle.canShow('starterPack')) {
+          promptThrottle.markShown('starterPack');
+          this.starterPackUI.show();
+        }
+      }, 800);
     }
   }
 
@@ -675,11 +747,44 @@ export class Game {
 
     this.hapticsSystem.resetChargeBuzz();
 
+    // Graze: late-release forgiveness band. Streak survives, combo doesn't
+    // increment, reward halved. Treated as a "phew" beat, not a fail.
+    if (result.outcome === 'graze') {
+      this.smashSystem.setChargeMultiplier(result.multiplier);
+      this.smashSystem.execute();
+      this.hapticsSystem.notifyError(); // soft buzz — different from clean impact
+      this.audioManager.playOverchargeFail();
+      this.overlays.showOvercharge();
+
+      const speedMul = 1 - this.store.state.speedLevel * CONFIG.upgradeSpeedBonus;
+      const delay = (CONFIG.smashDuration + CONFIG.spawnDelay) * speedMul * 1000;
+      setTimeout(() => {
+        if (this.inDailyChallenge) {
+          this.handleDailySmash();
+        } else {
+          this.spawnSystem.spawnNext();
+        }
+      }, delay);
+      return;
+    }
+
     if (!result.success) {
-      // First overcharge of the session is forgiven — streak survives.
-      if (this.comboSaveAvailable && this.store.state.streak > 0) {
-        this.comboSaveAvailable = false;
-        this.overlays.showSaved();
+      // Combo save bank: spend a save to downgrade streak instead of reset.
+      // Player keeps tier momentum but loses one tier of progress — stakes
+      // remain real, but the "session over" cliff is sanded down.
+      if (this.comboSavesAvailable > 0 && this.store.state.streak > 0) {
+        this.comboSavesAvailable--;
+        const tiers = CONFIG.comboTiers;
+        const currentTier = getComboTier(this.store.state.streak);
+        const currentIdx = tiers.findIndex(t => t.id === currentTier.id);
+        const prevThreshold = currentIdx > 0 ? tiers[currentIdx - 1].threshold : 0;
+        // Track the downgraded tier so the player has to climb past it again
+        // before banking another save.
+        this.lastComboTierIdx = Math.max(0, currentIdx - 1);
+        this.store.update({ streak: prevThreshold, combo: Math.max(1, prevThreshold) });
+        this.lastStreak = prevThreshold;
+        this.lastCombo = Math.max(1, prevThreshold);
+        this.overlays.showSaved(this.comboSavesAvailable);
         this.hapticsSystem.notifySuccess();
         return;
       }
@@ -879,9 +984,10 @@ export class Game {
     this.audioManager.playUIButton();
     this.overlays.showAdLoading(async () => {
       const success = await this.adManager.showRewarded('boost_2x_main');
+      // recordAdWatch + analytics + goals refresh happen via the AdManager
+      // onRewardEarned subscription wired in the constructor — don't
+      // duplicate them here.
       if (success) {
-        this.retentionChallengeSystem.recordAdWatch();
-        this.updateGoalsPanel();
         this.audioManager.playBoostActivate();
       } else {
         this.adPrompts.showAdUnavailable();
@@ -987,9 +1093,11 @@ export class Game {
 
   private offerSessionEndBonus(): void {
     const sessionCoins = this.adManager.getSessionCoinsEarned();
-    if (sessionCoins > 0 && this.adManager.canShowRewarded('session_end_bonus')) {
-      this.adPrompts.showSessionEndBonus(sessionCoins);
-    }
+    if (sessionCoins <= 0) return;
+    if (!this.adManager.canShowRewarded('session_end_bonus')) return;
+    if (!promptThrottle.canShow('sessionEndBonus')) return;
+    promptThrottle.markShown('sessionEndBonus');
+    this.adPrompts.showSessionEndBonus(sessionCoins);
   }
 
   // --- Retention Goals/Challenges ---
@@ -1035,6 +1143,11 @@ export class Game {
     requestAnimationFrame(() => this.animate());
     const rawDt = this.clock.getDelta();
 
+    // Adaptive perf knob — sample rawDt and downshift particle/shake/zoom on
+    // older devices. User accessibility prefs in motion-prefs stay
+    // authoritative; this can only further reduce density, not restore it.
+    this.perfMonitor.tick(rawDt);
+
     // TimeScale: update in real-time, produce scaled dt for game systems
     this.timeScaleSystem.update(rawDt);
     const dt = this.timeScaleSystem.getDt(rawDt);
@@ -1058,17 +1171,23 @@ export class Game {
       this.prevChargeLevel = level;
     }
 
-    // Streak idle timeout: reset combo if no smash for N seconds.
-    // Clamp the per-frame step so a stall spike (tab background, GC pause,
-    // heavy combo FX frame) can't instantly consume the whole timeout window.
-    if (this.store.state.streak > 0 && !this.store.state.isSmashing && !this.store.state.isCharging) {
-      this.streakIdleTimer += Math.min(rawDt, 0.1);
-      if (this.streakIdleTimer >= this.streakTimeoutSec) {
+    // Streak idle timeout: reset combo if no smash for streakTimeoutMs.
+    // Wall-clock based: a backgrounded tab returning after >timeout will
+    // see the elapsed time and reset; a brief GC pause (well under 4s)
+    // won't prematurely trigger.
+    const { streak, isSmashing, isCharging } = this.store.state;
+    if (streak > 0 && !isSmashing && !isCharging) {
+      if (this.streakIdleStartedAt === 0) {
+        this.streakIdleStartedAt = Date.now();
+      } else if (Date.now() - this.streakIdleStartedAt >= this.streakTimeoutMs) {
         this.store.update({ streak: 0, combo: 1 });
         this.lastStreak = 0;
         this.lastCombo = 1;
-        this.streakIdleTimer = 0;
+        this.streakIdleStartedAt = 0;
       }
+    } else if (isSmashing || isCharging) {
+      // Active interaction pauses the idle clock — restart on next still frame.
+      this.streakIdleStartedAt = 0;
     }
 
     // Ad system uses raw dt (countdown in real time)

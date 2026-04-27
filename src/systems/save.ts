@@ -1,4 +1,5 @@
 import { Store } from '../game/state';
+import { parseAndMigrate, wrapEnvelope } from './save-migrations';
 
 const SAVE_KEY = 'rage-smash-save';
 const OLD_SAVE_KEY = 'smash-loop-save';
@@ -21,7 +22,7 @@ interface SaveData {
   multiplierLevel: number;
   totalPerfectHits: number;
   dailyStreak: number;
-  jackpotBoostExpiresAt: number;
+  loginDay7BoostExpiresAt: number;
   adsRemoved: boolean;
   seenObjects: string[];
   unlockedAchievements: string[];
@@ -52,7 +53,10 @@ export class SaveSystem {
       }
       if (!raw) return;
 
-      const data: Partial<SaveData> = JSON.parse(raw);
+      const migrated = parseAndMigrate(raw);
+      if (!migrated) return; // unparseable — keep defaults
+
+      const data: Partial<SaveData> = migrated;
 
       // Build update object with only defined values to avoid overwriting defaults
       const updates: Partial<SaveData> = {};
@@ -73,7 +77,7 @@ export class SaveSystem {
       if (typeof data.multiplierLevel === 'number') updates.multiplierLevel = data.multiplierLevel;
       if (typeof data.totalPerfectHits === 'number') updates.totalPerfectHits = data.totalPerfectHits;
       if (typeof data.dailyStreak === 'number') updates.dailyStreak = data.dailyStreak;
-      if (typeof data.jackpotBoostExpiresAt === 'number') updates.jackpotBoostExpiresAt = data.jackpotBoostExpiresAt;
+      if (typeof data.loginDay7BoostExpiresAt === 'number') updates.loginDay7BoostExpiresAt = data.loginDay7BoostExpiresAt;
       if (typeof data.adsRemoved === 'boolean') updates.adsRemoved = data.adsRemoved;
       if (Array.isArray(data.seenObjects)) updates.seenObjects = data.seenObjects;
       if (Array.isArray(data.unlockedAchievements)) updates.unlockedAchievements = data.unlockedAchievements;
@@ -89,8 +93,10 @@ export class SaveSystem {
       if (Object.keys(updates).length > 0) {
         this.store.update(updates);
       }
-    } catch {
-      // Corrupt or missing data — silently ignore and use defaults
+    } catch (err) {
+      // Surface unexpected load failures so they show up in TestFlight logs
+      // instead of silently resetting a player's progress.
+      console.warn('[save] load failed, using defaults:', err);
     }
   }
 
@@ -115,13 +121,13 @@ export class SaveSystem {
         multiplierLevel: state.multiplierLevel,
         totalPerfectHits: state.totalPerfectHits,
         dailyStreak: state.dailyStreak,
-        jackpotBoostExpiresAt: state.jackpotBoostExpiresAt,
+        loginDay7BoostExpiresAt: state.loginDay7BoostExpiresAt,
         adsRemoved: state.adsRemoved,
         seenObjects: state.seenObjects,
         unlockedAchievements: state.unlockedAchievements,
         pressUpgrades: state.pressUpgrades,
       };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(wrapEnvelope(data)));
     } catch {
       // Storage full or unavailable — silently ignore
     }

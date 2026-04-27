@@ -19,6 +19,9 @@ function today(): string {
 export class GameAnalytics {
   private data: AnalyticsData;
   private sessionStart: number;
+  /** Set to true after endSession() runs so back-to-back fires (e.g.
+   *  visibilitychange-hidden + pagehide both firing) don't double-count. */
+  private sessionEnded: boolean = false;
 
   constructor() {
     this.sessionStart = Date.now();
@@ -87,13 +90,27 @@ export class GameAnalytics {
     }
   }
 
+  /** Record the current session's duration. Idempotent — multiple calls
+   *  in a row (e.g. from both visibilitychange and pagehide on iOS) only
+   *  count once. Use startNewSession() on resume to begin a fresh window. */
   endSession(): void {
+    if (this.sessionEnded) return;
+    this.sessionEnded = true;
     const duration = Math.round((Date.now() - this.sessionStart) / 1000);
     this.data.sessionLengths.push(duration);
     if (this.data.sessionLengths.length > 30) {
       this.data.sessionLengths = this.data.sessionLengths.slice(-30);
     }
     this.save();
+  }
+
+  /** Start a fresh session window. Called on resume from background so a
+   *  6-hour background -> visible doesn't report a 6-hour session length. */
+  startNewSession(): void {
+    if (!this.sessionEnded) return; // session is already active, no-op
+    this.sessionStart = Date.now();
+    this.sessionEnded = false;
+    this.recordSessionStart();
   }
 
   getStats(): {

@@ -1,5 +1,14 @@
 apply plugin: 'com.android.application'
 
+// AdMob app ID substitution. Resolution order:
+//   1. Gradle property `ADMOB_APP_ID_ANDROID` (e.g. ~/.gradle/gradle.properties or `-P` flag)
+//   2. Environment variable ADMOB_APP_ID_ANDROID (Codemagic / CI)
+//   3. Google's official sample app ID — only for dev/test builds; safe and
+//      won't generate real impressions. Release builds MUST override.
+def admobAppIdAndroid = project.findProperty('ADMOB_APP_ID_ANDROID') ?:
+        System.getenv('ADMOB_APP_ID_ANDROID') ?:
+        'ca-app-pub-3940256099942544~3347511713'
+
 android {
     namespace = "com.athletedomains.ragesmash"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -10,6 +19,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        manifestPlaceholders = [admobAppId: admobAppIdAndroid]
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -20,6 +30,13 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Hard-fail if a release build has a placeholder app ID.
+            if (admobAppIdAndroid.contains('XXXXX')) {
+                throw new GradleException(
+                    "Release build refused: AdMob app ID is a placeholder. " +
+                    "Set ADMOB_APP_ID_ANDROID via Gradle property or environment variable."
+                )
+            }
         }
     }
 }

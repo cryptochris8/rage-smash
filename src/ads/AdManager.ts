@@ -28,6 +28,11 @@ export class AdManager implements IAdSystem {
   private sessionStartTime = Date.now();
   private isFirstSession = false;
 
+  // Global ad throttle — covers BOTH rewarded and interstitial.
+  // Prevents back-to-back ad sequences (e.g., overcharge interstitial
+  // immediately followed by session-end-bonus rewarded prompt).
+  private lastAdSurfaceTime = 0;
+
   // Session tracking
   private sessionCoinsEarned = 0;
   private sessionSmashCount = 0;
@@ -35,6 +40,12 @@ export class AdManager implements IAdSystem {
 
   // Error state
   private lastError: string | null = null;
+
+  // Fan-out hook for ad-watch events. Subscribers (retention challenges,
+  // analytics, future systems) attach here once instead of every call site
+  // remembering to invoke them — closes the silent-miss bug where a new
+  // system depending on ad-watch was easy to forget at the call site.
+  private rewardListeners: Set<(placement: RewardedPlacement) => void> = new Set();
 
   constructor(store: Store) {
     this.store = store;
@@ -46,6 +57,14 @@ export class AdManager implements IAdSystem {
   /** Set audio manager reference for resuming audio after ads */
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
+  }
+
+  /** Subscribe to reward-earned events. Returns an unsubscribe fn.
+   *  Fires after a successful rewarded ad show, before per-placement reward
+   *  side-effects (boost activation, etc.) are applied. */
+  onRewardEarned(fn: (placement: RewardedPlacement) => void): () => void {
+    this.rewardListeners.add(fn);
+    return () => this.rewardListeners.delete(fn);
   }
 
   async init(): Promise<void> {
@@ -91,7 +110,17 @@ export class AdManager implements IAdSystem {
     // Check cooldown
     const cooldownRemaining = this.rewardCooldowns.get(placement) ?? 0;
     if (cooldownRemaining > 0) return false;
+    // Global anti-spam throttle (covers rewarded + interstitial).
+    if (!this.canShowAnyAd()) return false;
     return true;
+  }
+
+  /** Global throttle layered over per-placement cooldowns — guards against
+   *  any two ad surfaces firing within INTERSTITIAL_GATING.minGlobalGapMs.
+   *  Returns true on first call (lastAdSurfaceTime === 0). */
+  private canShowAnyAd(): boolean {
+    if (this.lastAdSurfaceTime === 0) return true;
+    return Date.now() - this.lastAdSurfaceTime >= INTERSTITIAL_GATING.minGlobalGapMs;
   }
 
   async showRewarded(placement: RewardedPlacement): Promise<boolean> {
@@ -107,6 +136,18 @@ export class AdManager implements IAdSystem {
       if (!success) {
         this.lastError = 'Ad unavailable, try again soon';
         return false;
+      }
+
+      // Stamp the global ad throttle so a rewarded show blocks any other
+      // ad surface for INTERSTITIAL_GATING.minGlobalGapMs.
+      this.lastAdSurfaceTime = Date.now();
+
+      // Fan out to subscribers (retention challenges, analytics, etc.).
+      // One throwing listener must not stop the rest or skip reward payout.
+      for (const fn of this.rewardListeners) {
+        try { fn(placement); } catch (err) {
+          console.warn('[AdManager] reward listener threw:', err);
+        }
       }
 
       // Apply reward based on placement
@@ -151,6 +192,8 @@ export class AdManager implements IAdSystem {
     const timeSinceLast = (Date.now() - this.lastInterstitialTime) / 1000;
     if (timeSinceLast < INTERSTITIAL_GATING.minSecondsBetween) return false;
     if (this.roundsSinceInterstitial < INTERSTITIAL_GATING.minRoundsSinceLast) return false;
+    // Global anti-spam throttle (covers rewarded + interstitial).
+    if (!this.canShowAnyAd()) return false;
     return true;
   }
 
@@ -160,7 +203,9 @@ export class AdManager implements IAdSystem {
       // Resume audio after ad overlay closes (iOS doesn't fire visibilitychange)
       this.audioManager?.resume();
       if (success) {
-        this.lastInterstitialTime = Date.now();
+        const now = Date.now();
+        this.lastInterstitialTime = now;
+        this.lastAdSurfaceTime = now;
         this.roundsSinceInterstitial = 0;
         this.provider.loadInterstitial('session_end').catch(() => {});
       }

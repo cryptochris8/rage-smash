@@ -7,6 +7,9 @@
     "dev": "vite --port 5174",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "verify:ads": "node scripts/check-admob.cjs",
+    "verify:ads:ios": "node scripts/check-admob.cjs ios",
+    "verify:ads:android": "node scripts/check-admob.cjs android",
     "cap:sync": "npm run build && npx cap sync",
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios",
     "cap:android": "npm run build && npx cap sync android && npx cap open android"

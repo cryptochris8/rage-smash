@@ -253,7 +253,7 @@ export class PressSystem {
 
     // Jackpot roll
     const eventJackpotMul = this.eventSystem.isJackpotBoosted() ? 2 : 1;
-    const streakBoostMul = state.jackpotBoostExpiresAt > Date.now() ? 2 : 1;
+    const streakBoostMul = state.loginDay7BoostExpiresAt > Date.now() ? 2 : 1;
     const jackpotChanceMul = eventJackpotMul * streakBoostMul;
     const jackpot = this.jackpotSystem.roll(jackpotChanceMul);
     const finalCoins = jackpot.triggered ? result.coins * jackpot.multiplier : result.coins;

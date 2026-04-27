@@ -2,6 +2,7 @@ import { Store } from '../game/state';
 import { StarterPackSystem } from '../systems/starter-pack';
 import { AudioManager } from '../audio/AudioManager';
 import { StoreKitManager, PRODUCT_IDS } from '../iap/StoreKitManager';
+import { bindAsyncButton, showToast } from './components';
 
 export class StarterPackUI {
   private container: HTMLElement;
@@ -148,27 +149,35 @@ export class StarterPackUI {
       textShadow: '0 2px 4px rgba(0,0,0,0.3)',
       boxShadow: '0 4px 16px rgba(34,197,94,0.3)',
     });
-    buyBtn.addEventListener('pointerdown', async (e) => {
-      e.stopPropagation();
-      if (!this.storeKit.isAvailable()) {
-        // IAP not available — hide the modal, don't grant free rewards
+    // Pre-flight: if IAP isn't available at all (web build), close silently
+    // — never grant free rewards from a stub.
+    if (!this.storeKit.isAvailable()) {
+      buyBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
         console.warn('[StarterPackUI] StoreKit not available, cannot purchase');
         this.hide();
-        return;
-      }
-      // Real IAP
-      buyBtn.textContent = 'Processing...';
-      buyBtn.style.pointerEvents = 'none';
-      const success = await this.storeKit.purchase(PRODUCT_IDS.starterPack);
-      if (success) {
-        this.starterPack.purchase();
-        this.audioManager.playDailyReward();
-        this.hide();
-      } else {
-        buyBtn.textContent = displayPrice ? `BUY ${displayPrice}` : 'BUY $1.99';
-        buyBtn.style.pointerEvents = 'auto';
-      }
-    });
+      });
+    } else {
+      bindAsyncButton(
+        buyBtn,
+        () => this.storeKit.purchase(PRODUCT_IDS.starterPack),
+        {
+          pendingLabel: 'Processing...',
+          timeoutMs: 30_000, // StoreKit prompts can be slow when Touch ID/passcode is required
+          label: 'Purchase',
+          onSuccess: (success) => {
+            if (success) {
+              this.starterPack.purchase();
+              this.audioManager.playDailyReward();
+              this.hide();
+            } else {
+              showToast('Purchase cancelled', 'info');
+            }
+          },
+          onError: () => showToast('Purchase failed, please try again', 'danger'),
+        },
+      );
+    }
     card.appendChild(buyBtn);
 
     // Dismiss

@@ -1,6 +1,9 @@
 import { Store } from '../game/state';
 import { AdManager } from '../ads/AdManager';
 import { AudioManager } from '../audio/AudioManager';
+import { withTimeout, TimeoutError } from './components';
+
+const AD_TIMEOUT_MS = 30_000;
 
 export class AdPrompts {
   private container: HTMLElement;
@@ -48,7 +51,7 @@ export class AdPrompts {
     watchBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
       this.removeModal(root);
-      const success = await this.adManager.showRewarded('session_end_bonus');
+      const success = await this.safeShowRewarded('session_end_bonus');
       if (success) {
         this.store.update({ coins: this.store.state.coins + bonus });
         this.audioManager.playDailyReward();
@@ -90,7 +93,7 @@ export class AdPrompts {
     watchBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
       this.removeModal(root);
-      const success = await this.adManager.showRewarded('upgrade_rescue');
+      const success = await this.safeShowRewarded('upgrade_rescue');
       if (success) {
         this.store.update({ coins: this.store.state.coins + needed });
         this.audioManager.playDailyReward();
@@ -131,7 +134,7 @@ export class AdPrompts {
     watchBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
       this.removeModal(root);
-      const success = await this.adManager.showRewarded('jackpot_bonus');
+      const success = await this.safeShowRewarded('jackpot_bonus');
       if (success) {
         this.store.update({ coins: this.store.state.coins + jackpotCoins });
         this.audioManager.playDailyReward();
@@ -171,7 +174,7 @@ export class AdPrompts {
     watchBtn.addEventListener('pointerdown', async (e) => {
       e.stopPropagation();
       this.removeModal(root);
-      const success = await this.adManager.showRewarded('daily_bonus_optional');
+      const success = await this.safeShowRewarded('daily_bonus_optional');
       if (success) {
         this.store.update({ coins: this.store.state.coins + rewardCoins });
         this.audioManager.playDailyReward();
@@ -348,5 +351,21 @@ export class AdPrompts {
 
   private removeModal(root: HTMLDivElement): void {
     root.remove();
+  }
+
+  /** Show a rewarded ad with a timeout safety net. A hung ad SDK promise
+   *  cannot grant coins minutes later — after AD_TIMEOUT_MS we treat it as
+   *  failed and surface the standard "Ad unavailable" toast. */
+  private async safeShowRewarded(
+    placement: 'session_end_bonus' | 'upgrade_rescue' | 'jackpot_bonus' | 'daily_bonus_optional',
+  ): Promise<boolean> {
+    try {
+      return await withTimeout(this.adManager.showRewarded(placement), AD_TIMEOUT_MS, 'Ad');
+    } catch (err) {
+      if (err instanceof TimeoutError) {
+        console.warn(`[AdPrompts] ${placement} timed out`);
+      }
+      return false;
+    }
   }
 }

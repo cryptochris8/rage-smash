@@ -19,6 +19,15 @@ export const CONFIG = {
   spawnDelay: 0.3,
   spawnAnimDuration: 0.35,
 
+  // Fragment physics — multi-bounce with diminishing energy until rest.
+  fragmentRestY: 0.1,                // ground plane (visual offset above floor)
+  fragmentRestitution: 0.45,         // fraction of vertical velocity preserved per bounce
+  fragmentFriction: 0.7,             // lateral velocity preserved per bounce
+  fragmentAngularDamping: 0.85,      // rotational velocity preserved per bounce
+  fragmentRestVelocitySq: 0.25,      // |v|² below this on the ground -> snap to rest
+  fragmentMaxBounces: 3,             // hard cap to avoid edge-case jitter
+  fragmentSlideDamping: 0.94,        // per-step lateral damping while at rest threshold
+
   // Rendering
   maxFragments: 30,
   cameraFov: 65,
@@ -127,6 +136,22 @@ export const CONFIG = {
   chargeMultiplierLow: 0.5,
   chargeMultiplierOptimalMax: 2.0,
   chargeMultiplierDanger: 2.0,
+
+  // Graze zone — late-release forgiveness band beyond 1.0.
+  // [chargeOverchargeThreshold .. chargeFailThreshold]: streak SURVIVES but
+  // combo doesn't tick up and reward is reduced. Beyond chargeFailThreshold:
+  // hard fail (streak reset, combo save consumable).
+  chargeFailThreshold: 1.1,
+  chargeMultiplierGraze: 0.5,
+  chargeBarMaxFill: 1.15,           // visual headroom past 1.0 so the scorch band reads
+
+  // --- Combo Save Bank ---
+  // Players start with one mercy and earn another every time they reach a
+  // new combo tier (bronze/silver/gold/platinum/legendary/mythic), capped
+  // at comboSaveMax. Using a save downgrades streak to the previous tier
+  // threshold instead of full reset — keeps stakes real.
+  comboSaveStartingBank: 1,
+  comboSaveMax: 2,
 
   // --- Phase 4: Daily Login Rewards ---
   loginRewards: [100, 500, 2000, 5000, 5000, 5000, 10000],

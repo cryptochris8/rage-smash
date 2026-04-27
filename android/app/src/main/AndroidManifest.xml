@@ -34,10 +34,12 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- AdMob App ID — replace with your real ID from https://admob.google.com -->
+        <!-- AdMob App ID — substituted at build time from android/app/build.gradle
+             via manifestPlaceholders (Gradle prop ADMOB_APP_ID_ANDROID, env
+             var, or local.properties). Real values are not committed to git. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-XXXXX~XXXXX" />
+            android:value="${admobAppId}" />
     </application>
 
     <!-- Permissions -->

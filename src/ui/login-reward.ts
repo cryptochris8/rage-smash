@@ -222,7 +222,7 @@ export class LoginRewardUI {
     this.store.update({
       coins: this.store.state.coins + result.coins,
       dailyStreak: result.streak,
-      jackpotBoostExpiresAt: this.loginSystem.getJackpotBoostExpiresAt(),
+      loginDay7BoostExpiresAt: this.loginSystem.getLoginDay7BoostExpiresAt(),
     });
     this.audioManager.playDailyReward();
 

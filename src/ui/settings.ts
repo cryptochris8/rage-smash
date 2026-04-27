@@ -8,6 +8,7 @@ import {
 } from '../systems/motion-prefs';
 import { OBJECTS } from '../content/objects';
 import { ACHIEVEMENTS } from '../systems/achievements';
+import { bindAsyncButton, showToast } from './components';
 
 export class SettingsUI {
   private container: HTMLElement;
@@ -153,19 +154,26 @@ export class SettingsUI {
         pointerEvents: 'auto',
         WebkitTapHighlightColor: 'transparent',
       });
-      removeAdsBtn.addEventListener('pointerdown', async (e) => {
-        e.stopPropagation();
-        removeAdsBtn.textContent = 'Processing...';
-        removeAdsBtn.style.pointerEvents = 'none';
-        const success = await this.onRemoveAds();
-        if (success) {
-          removeAdsBtn.textContent = 'Ads Removed';
-          removeAdsBtn.style.opacity = '0.5';
-        } else {
-          removeAdsBtn.textContent = 'Remove Ads — $2.99';
-          removeAdsBtn.style.pointerEvents = 'auto';
-        }
-      });
+      bindAsyncButton(
+        removeAdsBtn,
+        () => this.onRemoveAds(),
+        {
+          pendingLabel: 'Processing...',
+          timeoutMs: 30_000,
+          label: 'Remove Ads',
+          onSuccess: (success) => {
+            if (success) {
+              removeAdsBtn.textContent = 'Ads Removed';
+              removeAdsBtn.style.opacity = '0.5';
+              removeAdsBtn.style.pointerEvents = 'none';
+              removeAdsBtn.disabled = true;
+            } else {
+              removeAdsBtn.textContent = 'Remove Ads — $2.99';
+            }
+          },
+          onError: () => showToast('Purchase failed, please try again', 'danger'),
+        },
+      );
       panel.appendChild(removeAdsBtn);
     } else {
       const removedLabel = document.createElement('div');
@@ -199,21 +207,29 @@ export class SettingsUI {
       WebkitTapHighlightColor: 'transparent',
       marginTop: '8px',
     });
-    restoreBtn.addEventListener('pointerdown', async (e) => {
-      e.stopPropagation();
-      restoreBtn.textContent = 'Restoring...';
-      restoreBtn.style.pointerEvents = 'none';
-      const restored = await this.onRestore();
-      if (restored.length > 0) {
-        restoreBtn.textContent = `Restored: ${restored.join(', ')}`;
-      } else {
-        restoreBtn.textContent = 'No purchases to restore';
-      }
-      setTimeout(() => {
-        restoreBtn.textContent = 'Restore Purchases';
-        restoreBtn.style.pointerEvents = 'auto';
-      }, 2000);
-    });
+    bindAsyncButton(
+      restoreBtn,
+      () => this.onRestore(),
+      {
+        pendingLabel: 'Restoring...',
+        timeoutMs: 20_000,
+        label: 'Restore',
+        onSuccess: (result) => {
+          const restored = result as string[];
+          if (restored.length > 0) {
+            restoreBtn.textContent = `Restored: ${restored.join(', ')}`;
+          } else {
+            restoreBtn.textContent = 'No purchases to restore';
+          }
+          // Revert label after 2s. The button is re-enabled by bindAsyncButton's
+          // finally block, so this is just the label timer.
+          setTimeout(() => {
+            restoreBtn.textContent = 'Restore Purchases';
+          }, 2000);
+        },
+        onError: () => showToast('Restore failed, please try again', 'danger'),
+      },
+    );
     panel.appendChild(restoreBtn);
     } // end isNative
 
@@ -275,6 +291,26 @@ export class SettingsUI {
       this.confirmReset();
     });
     panel.appendChild(resetBtn);
+
+    // Web-only install hint. Players on the web build can't see ads, can't
+    // make IAP, and can't unlock starter pack — surface a single line so
+    // they know the mobile build exists.
+    if (!isNative) {
+      const installHint = document.createElement('div');
+      installHint.textContent = 'Get more on iOS or Android — boosts, ad-free option, starter pack';
+      Object.assign(installHint.style, {
+        fontSize: '12px',
+        color: 'rgba(167,139,250,0.85)',
+        textAlign: 'center',
+        marginTop: '16px',
+        padding: '10px 14px',
+        background: 'rgba(99,102,241,0.10)',
+        border: '1px solid rgba(139,92,246,0.25)',
+        borderRadius: '10px',
+        lineHeight: '1.4',
+      });
+      panel.appendChild(installHint);
+    }
 
     // Version
     const version = document.createElement('div');

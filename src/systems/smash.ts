@@ -378,7 +378,7 @@ export class SmashSystem {
 
     // Jackpot roll (doubled chance during Jackpot Frenzy event and/or Day 7 streak boost)
     const eventJackpotMul = this.eventSystem.isJackpotBoosted() ? 2 : 1;
-    const streakBoostMul = this.store.state.jackpotBoostExpiresAt > Date.now() ? 2 : 1;
+    const streakBoostMul = this.store.state.loginDay7BoostExpiresAt > Date.now() ? 2 : 1;
     const jackpotChanceMul = eventJackpotMul * streakBoostMul;
     const jackpot = this.jackpotSystem.roll(jackpotChanceMul);
     const finalCoins = jackpot.triggered ? result.coins * jackpot.multiplier : result.coins;

@@ -352,10 +352,13 @@ export class Overlays {
     requestAnimationFrame(animate);
   }
 
-  /** Green "SAVED!" label when combo survives an overcharge (one per session) */
-  showSaved(): void {
+  /** Green "SAVED!" label when combo survives an overcharge.
+   *  Optionally shows the remaining combo-save bank below. */
+  showSaved(remaining?: number): void {
     const el = document.createElement('div');
-    el.textContent = 'SAVED!';
+    el.innerHTML = remaining !== undefined
+      ? `SAVED!<div style="font-size:14px;margin-top:6px;letter-spacing:2px;opacity:0.85;">${remaining} ${remaining === 1 ? 'SAVE' : 'SAVES'} LEFT</div>`
+      : 'SAVED!';
     Object.assign(el.style, {
       position: 'absolute',
       left: '50%',
@@ -374,6 +377,7 @@ export class Overlays {
       opacity: '0',
       willChange: 'transform, opacity',
       letterSpacing: '3px',
+      textAlign: 'center',
     });
 
     this.container.appendChild(el);

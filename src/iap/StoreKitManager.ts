@@ -22,6 +22,8 @@ interface StoreKitPluginInterface {
 
 const StoreKit = registerPlugin<StoreKitPluginInterface>('StoreKit');
 
+const ENTITLEMENT_CACHE_KEY = 'rage-smash-entitlements';
+
 export const PRODUCT_IDS = {
   removeAds: 'com.athletedomains.ragesmash.removeads',
   starterPack: 'com.athletedomains.ragesmash.starterpack',
@@ -112,6 +114,8 @@ export class StoreKitManager {
 
     try {
       const result = await StoreKit.restorePurchases();
+      // Refresh cache so the next launch's mismatch check sees post-restore truth.
+      this.cacheEntitlements(result.entitlements);
       return result.entitlements;
     } catch (err) {
       console.warn('[StoreKitManager] Restore failed:', err);
@@ -119,16 +123,64 @@ export class StoreKitManager {
     }
   }
 
-  /** Check current entitlements (for launch verification). Returns active product IDs. */
+  /** Check current entitlements (for launch verification). Returns active
+   *  product IDs. Compares against the cached set from a previous launch
+   *  and logs any mismatch (entitlement added since last launch, or
+   *  unexpectedly missing). StoreKit is treated as authoritative — the
+   *  cache is purely for detection, never for granting. No server-side
+   *  validation: at this scale, StoreKit + Apple's receipt validation is
+   *  cryptographically sufficient. */
   async checkEntitlements(): Promise<string[]> {
     if (!this.isNative) return [];
 
     try {
       const result = await StoreKit.checkEntitlements();
+      this.detectEntitlementMismatch(result.entitlements);
+      this.cacheEntitlements(result.entitlements);
       return result.entitlements;
     } catch (err) {
       console.warn('[StoreKitManager] Entitlement check failed:', err);
       return [];
+    }
+  }
+
+  /** Read the previous launch's entitlement snapshot. Returns [] if missing
+   *  or unparseable. Surfaces stale-state cases — e.g., player owned
+   *  Remove Ads at last launch but StoreKit no longer reports it (refund,
+   *  family-sharing change, signed in to different Apple ID). */
+  private getCachedEntitlements(): string[] {
+    try {
+      const raw = localStorage.getItem(ENTITLEMENT_CACHE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((s: unknown) => typeof s === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private cacheEntitlements(entitlements: string[]): void {
+    try {
+      localStorage.setItem(ENTITLEMENT_CACHE_KEY, JSON.stringify(entitlements));
+    } catch {
+      // Storage full or unavailable — non-fatal, the cache is a probe not authority.
+    }
+  }
+
+  private detectEntitlementMismatch(current: string[]): void {
+    const cached = this.getCachedEntitlements();
+    if (cached.length === 0 && current.length === 0) return;
+    const currentSet = new Set(current);
+    const cachedSet = new Set(cached);
+    const added = current.filter((id) => !cachedSet.has(id));
+    const removed = cached.filter((id) => !currentSet.has(id));
+    if (added.length > 0) {
+      console.log('[StoreKitManager] Entitlements gained since last launch:', added);
+    }
+    if (removed.length > 0) {
+      // Stale cache. Most common cause: refund, family-sharing revocation, or
+      // signed in with a different Apple ID. Trust StoreKit's current view.
+      console.warn('[StoreKitManager] Entitlements lost since last launch:', removed);
     }
   }
 }

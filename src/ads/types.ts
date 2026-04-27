@@ -21,6 +21,11 @@ export interface InterstitialGating {
   minRoundsSinceLast: number;
   firstSessionProtected: boolean;
   minSessionLengthSec: number;
+  /** Minimum gap between ANY two ad surfaces (rewarded + interstitial),
+   *  in milliseconds. Layered on top of per-placement cooldowns to
+   *  prevent back-to-back ad sequences (e.g., overcharge interstitial
+   *  immediately followed by session-end-bonus rewarded prompt). */
+  minGlobalGapMs: number;
 }
 
 export type AdEventType =

@@ -1,10 +1,13 @@
 import { CONFIG } from '../game/config';
 import { Store } from '../game/state';
 
+export type ChargeOutcome = 'low' | 'optimal' | 'danger' | 'graze' | 'fail';
+
 export interface ChargeResult {
   success: boolean;
   level: number;
   multiplier: number;
+  outcome: ChargeOutcome;
 }
 
 export class ChargeSystem {
@@ -24,7 +27,10 @@ export class ChargeSystem {
 
   update(dt: number): void {
     if (!this.charging) return;
-    this.level = Math.min(this.level + CONFIG.chargeRate * dt, 1.0);
+    // Allow fill to overshoot 1.0 into the graze band so the player feels the
+    // late-release forgiveness window. Hard cap at chargeBarMaxFill prevents
+    // unbounded values during very long holds.
+    this.level = Math.min(this.level + CONFIG.chargeRate * dt, CONFIG.chargeBarMaxFill);
     this.store.update({ chargeLevel: this.level });
   }
 
@@ -34,25 +40,34 @@ export class ChargeSystem {
     this.level = 0;
     this.store.update({ isCharging: false, chargeLevel: 0 });
 
-    // Over threshold → fail
-    if (level >= CONFIG.chargeOverchargeThreshold) {
-      return { success: false, level, multiplier: 0 };
+    // Beyond fail threshold → hard miss (streak reset, combo-save eligible).
+    if (level >= CONFIG.chargeFailThreshold) {
+      return { success: false, level, multiplier: 0, outcome: 'fail' };
     }
 
-    let multiplier: number;
+    // Graze zone (1.0 .. chargeFailThreshold): streak survives but reward
+    // reduced and combo doesn't tick up. Caller treats this as a soft miss.
+    if (level >= CONFIG.chargeOverchargeThreshold) {
+      return {
+        success: true,
+        level,
+        multiplier: CONFIG.chargeMultiplierGraze,
+        outcome: 'graze',
+      };
+    }
+
     if (level < CONFIG.chargeOptimalMin) {
       // Below optimal zone: low multiplier
-      multiplier = CONFIG.chargeMultiplierLow;
-    } else if (level <= CONFIG.chargeOptimalMax) {
+      return { success: true, level, multiplier: CONFIG.chargeMultiplierLow, outcome: 'low' };
+    }
+    if (level <= CONFIG.chargeOptimalMax) {
       // Optimal zone: scale from 1.0 to optimal max
       const t = (level - CONFIG.chargeOptimalMin) / (CONFIG.chargeOptimalMax - CONFIG.chargeOptimalMin);
-      multiplier = 1.0 + t * (CONFIG.chargeMultiplierOptimalMax - 1.0);
-    } else {
-      // Danger zone: high risk, high reward
-      multiplier = CONFIG.chargeMultiplierDanger;
+      const multiplier = 1.0 + t * (CONFIG.chargeMultiplierOptimalMax - 1.0);
+      return { success: true, level, multiplier, outcome: 'optimal' };
     }
-
-    return { success: true, level, multiplier };
+    // Danger zone (chargeOptimalMax..chargeOverchargeThreshold)
+    return { success: true, level, multiplier: CONFIG.chargeMultiplierDanger, outcome: 'danger' };
   }
 
   cancelCharge(): void {

@@ -7,15 +7,38 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
  * Models are auto-normalized at load time so that their largest dimension
  * fits within 1 unit. Registry `scale` values then act as a simple
  * multiplier (e.g. scale 1.0 = 1 unit tall, scale 1.5 = 1.5 units tall).
+ *
+ * Cache is LRU-bounded so room/skin churn over a long session can't grow
+ * GPU memory without bound. The currently-equipped hammer + current room
+ * (anything returned by `activePathsProvider`) is never evicted.
  */
 export class ModelManager {
   private loader = new GLTFLoader();
+  /** Map preserves insertion order; we re-insert on hit to mark "freshest". */
   private cache = new Map<string, THREE.Group>();
   private pending = new Map<string, Promise<THREE.Group | null>>();
+  private maxCacheSize: number;
+  private activePathsProvider: () => Set<string> = () => new Set();
+
+  constructor(maxCacheSize: number = 32) {
+    this.maxCacheSize = maxCacheSize;
+  }
+
+  /** Caller registers a function that returns paths which must NOT be
+   *  evicted (current hammer model, currently equipped skins, etc.). */
+  setActivePathsProvider(fn: () => Set<string>): void {
+    this.activePathsProvider = fn;
+  }
 
   /** Load a GLB, normalize its size, and cache it. Returns null on failure. */
   async load(path: string): Promise<THREE.Group | null> {
-    if (this.cache.has(path)) return this.cache.get(path)!;
+    if (this.cache.has(path)) {
+      // Mark as freshest by re-inserting (Map insertion order = LRU order).
+      const cached = this.cache.get(path)!;
+      this.cache.delete(path);
+      this.cache.set(path, cached);
+      return cached;
+    }
     if (this.pending.has(path)) return this.pending.get(path)!;
 
     const promise = new Promise<THREE.Group | null>((resolve) => {
@@ -30,6 +53,7 @@ export class ModelManager {
           container.add(root);
           this.cache.set(path, container);
           this.pending.delete(path);
+          this.evictIfOverCapacity();
           resolve(container);
         },
         undefined,
@@ -49,6 +73,9 @@ export class ModelManager {
   get(path: string): THREE.Group | null {
     const original = this.cache.get(path);
     if (!original) return null;
+    // Cache hit also marks freshest.
+    this.cache.delete(path);
+    this.cache.set(path, original);
     return original.clone();
   }
 
@@ -83,6 +110,34 @@ export class ModelManager {
       this.disposeGroup(root);
     }
     this.cache.clear();
+  }
+
+  /** Visible for tests / dev probe. */
+  getCacheSize(): number {
+    return this.cache.size;
+  }
+
+  /**
+   * If cache exceeds `maxCacheSize`, evict from oldest entries first,
+   * skipping anything in the active set or still pending. May leave the
+   * cache at slightly > max if everything is active — better than evicting
+   * the equipped hammer.
+   */
+  private evictIfOverCapacity(): void {
+    if (this.cache.size <= this.maxCacheSize) return;
+    const active = this.activePathsProvider();
+    let toEvict = this.cache.size - this.maxCacheSize;
+    // Iterate in insertion order (oldest first).
+    for (const path of this.cache.keys()) {
+      if (toEvict <= 0) break;
+      if (active.has(path)) continue;
+      if (this.pending.has(path)) continue;
+      const root = this.cache.get(path);
+      if (!root) continue;
+      this.disposeGroup(root);
+      this.cache.delete(path);
+      toEvict--;
+    }
   }
 
   /**

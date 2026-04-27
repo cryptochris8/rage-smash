@@ -41,13 +41,14 @@ export class ChargeBar {
     });
     this.root.appendChild(this.fill);
 
-    // Zone markers
+    // Zone markers — relative to the bar's actual range (chargeBarMaxFill).
+    const range = CONFIG.chargeBarMaxFill;
     const markerPositions = [CONFIG.chargeOptimalMin, CONFIG.chargeOptimalMax, CONFIG.chargeDangerMax];
     for (const pos of markerPositions) {
       const marker = document.createElement('div');
       Object.assign(marker.style, {
         position: 'absolute',
-        left: `${pos * 100}%`,
+        left: `${(pos / range) * 100}%`,
         top: '0',
         width: '2px',
         height: '100%',
@@ -56,6 +57,22 @@ export class ChargeBar {
       });
       this.root.appendChild(marker);
     }
+
+    // Scorch band — graze zone (1.0 .. chargeFailThreshold). Visual cue that
+    // releasing here is forgiven but reward is reduced.
+    const scorchStart = CONFIG.chargeOverchargeThreshold / range;
+    const scorchEnd = CONFIG.chargeFailThreshold / range;
+    const scorch = document.createElement('div');
+    Object.assign(scorch.style, {
+      position: 'absolute',
+      left: `${scorchStart * 100}%`,
+      top: '0',
+      width: `${(scorchEnd - scorchStart) * 100}%`,
+      height: '100%',
+      background: 'repeating-linear-gradient(45deg, rgba(239,68,68,0.55) 0 4px, rgba(239,68,68,0.25) 4px 8px)',
+      pointerEvents: 'none',
+    });
+    this.root.appendChild(scorch);
 
     this.container.appendChild(this.root);
 
@@ -69,7 +86,10 @@ export class ChargeBar {
 
     if (!isCharging) return;
 
-    const pct = Math.min(chargeLevel * 100, 100);
+    // Bar represents 0..chargeBarMaxFill, so a chargeLevel of 1.0 fills to
+    // ~87% and the graze band fills the remainder.
+    const range = CONFIG.chargeBarMaxFill;
+    const pct = Math.min((chargeLevel / range) * 100, 100);
     this.fill.style.width = `${pct}%`;
 
     // Color based on zone
@@ -80,8 +100,10 @@ export class ChargeBar {
       color = '#22c55e'; // bright green – optimal
     } else if (chargeLevel <= CONFIG.chargeDangerMax) {
       color = '#eab308'; // yellow – danger
+    } else if (chargeLevel < CONFIG.chargeOverchargeThreshold) {
+      color = '#f97316'; // orange – pre-overcharge
     } else {
-      color = '#ef4444'; // red – overcharge
+      color = '#ef4444'; // red – graze / overcharge
     }
     this.fill.style.background = color;
   }
