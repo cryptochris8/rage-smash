@@ -8,9 +8,12 @@ workflows:
     environment:
       node: 22
       xcode: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.athletedomains.ragesmash
+      # Variable group `smash` (shared with Squishy Smash) supplies
+      # CERTIFICATE_PRIVATE_KEY — the RSA private key the codemagic-cli-tools
+      # auto-signing flow uses to fetch or create the App Store distribution
+      # certificate via the Pregame ASC API integration.
+      groups:
+        - smash
       vars:
         BUNDLE_ID: "com.athletedomains.ragesmash"
     scripts:
@@ -26,9 +29,25 @@ workflows:
       - name: Sync Capacitor iOS
         script: |
           npx cap sync ios
-      - name: Set up code signing
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Fetch signing files (creates cert + profile if missing)
+        # --create lets the ASC API auto-create both the distribution
+        # certificate (using CERTIFICATE_PRIVATE_KEY) and the App Store
+        # provisioning profile when they don't already exist. This is the
+        # recovery path for "no matching profiles found" — replaces the
+        # legacy ios_signing: block which depended on team-level certs
+        # uploaded to Codemagic's signing-identities tab.
         script: |
-          xcode-project use-profiles
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+      - name: Add certificates to keychain
+        script: keychain add-certificates
+      - name: Apply Xcode provisioning profiles
+        script: xcode-project use-profiles
       - name: Build iOS app
         script: |
           xcode-project build-ipa \
